@@ -10,6 +10,7 @@ typedef enum
     SUCCESS = 0,
     GENERIC_ERROR,
     ALREADY_CONFIGURED,
+    MEM_ALLOC_ERROR
 
 } rtrn_val_t;
 

@@ -4,6 +4,7 @@
 #include <esp_log.h>
 #include <stdbool.h>
 #include <freertos/FreeRTOS.h>
+#include <esp_random.h>
 
 #include "led_strip.h"
 
@@ -11,6 +12,8 @@
 #include "led_matrix_driver.h"
 
 #define ARRAY_LENGTH(x) sizeof(x) / sizeof(x[0])
+
+static const char *TAG_MAIN = "APP_MAIN";
 
 void app_main(void)
 {
@@ -28,6 +31,8 @@ void app_main(void)
         printf("\narray_length = %d\n", new_data.array_length);
 
         updateLedMatrix(&new_data);
+
+        ESP_LOGW(TAG_MAIN, "Random Number = %ld\n", esp_random() % 1000);
 
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
