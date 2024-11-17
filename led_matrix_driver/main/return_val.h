@@ -2,8 +2,8 @@
 // These return values belong to the LED_MATRIX_GAME
 //
 
-#ifndef RTRN_VAL
-#define RTRN_VAL
+#ifndef RETURN_VAL
+#define RETURN_VAL
 
 typedef enum
 {
@@ -12,6 +12,6 @@ typedef enum
     ALREADY_CONFIGURED,
     MEM_ALLOC_ERROR
 
-} rtrn_val_t;
+} return_val_t;
 
 #endif

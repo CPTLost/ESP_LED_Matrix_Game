@@ -11,7 +11,7 @@
 
 /// Components/other manually created header files
 #include "led_strip.h"
-#include "rtrn_val.h"
+#include "return_val.h"
 
 /*Maybe put into SDK config in the main project?*/
 
@@ -38,7 +38,7 @@ static bool g_led_matrix_configured = false;
 
 static led_strip_handle_t led_matrix;
 
-rtrn_val_t initLedMatrix(void)
+return_val_t initLedMatrix(void)
 {
     // It is not allowed to configure the same Matrix multiple times -> checks if g_led_matrix_configured == true
     if (false == g_led_matrix_configured)
@@ -65,7 +65,7 @@ rtrn_val_t initLedMatrix(void)
     }
 }
 
-__attribute__((weak)) rtrn_val_t updateLedMatrix(led_matrix_data_t *new_data)
+__attribute__((weak)) return_val_t updateLedMatrix(led_matrix_data_t *new_data)
 {
     led_strip_clear(led_matrix);
     for (uint16_t i = 0; i < new_data->array_length; i += 1)
@@ -86,7 +86,7 @@ __attribute__((weak)) rtrn_val_t updateLedMatrix(led_matrix_data_t *new_data)
 /// Lookup Tabel for the actual physical LED index in the 32x32 LED Matrix
 static const uint16_t index_array_of_32x32_led_matrix[32 * 32];
 
-rtrn_val_t updateLedMatrix(led_matrix_data_t *new_data)
+return_val_t updateLedMatrix(led_matrix_data_t *new_data)
 {
     led_strip_clear(led_matrix);
     for (uint16_t i = 0; i < new_data->array_length; i += 1)

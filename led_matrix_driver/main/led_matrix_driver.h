@@ -1,7 +1,7 @@
 #ifndef LED_MATRIX_DRIVER
 #define LED_MATRIX_DRIVER
 
-#include "rtrn_val.h"
+#include "return_val.h"
 #include <inttypes.h>
 
 typedef struct
@@ -12,7 +12,7 @@ typedef struct
     uint16_t array_length;
 } led_matrix_data_t;
 
-rtrn_val_t initLedMatrix(void);
-rtrn_val_t updateLedMatrix(led_matrix_data_t *new_data);
+return_val_t initLedMatrix(void);
+return_val_t updateLedMatrix(led_matrix_data_t *new_data);
 
 #endif
