@@ -13,9 +13,9 @@
 /*Maybe put into SDK config in the main project?*/
 
 /// Selection of the used led matrix hardware
-// #define MATRIX_32X32
+#define MATRIX_32X32
 // #define MATRIX_16X16
-#define MATRIX_5X5
+// #define MATRIX_5X5
 
 #ifdef MATRIX_5X5
 #define MATRIX_SIDE_LENGTH 5
@@ -172,7 +172,7 @@ led_matrix_data_t *updateAsteroidField()
         }
     }
     /// For every update except the first it is necessary to check if random values are valid
-    /// That means the new value is not directly behind the last value and there is a possible path to take for the player
+    /// That means the new value must not be directly behind the last value and there must be a possible path to take for the player
     else
     {
         // here comes validity check code ....
@@ -183,6 +183,7 @@ led_matrix_data_t *updateAsteroidField()
         }
     }
     // array_length for more than one LED must be changed !!!
+
     // Checking if max ring buffer size is reached (= MATRIX_SIDE_LENGTH)
     if (MATRIX_SIDE_LENGTH > asteroid_indices_list.size)
     {

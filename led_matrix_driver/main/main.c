@@ -24,8 +24,8 @@ void app_main(void)
 
         // circular_linked_list_test();
 
-        uint16_t index_array[] = {1, 2, 4, 9, 3};
-        uint8_t rgb_array[][3] = {{25, 0, 0}, {0, 25, 0}, {0, 0, 25}, {10, 10, 10}, {0, 0, 50}};
+        uint16_t index_array[] = {1, 2, 4, 9, 3, 255};
+        uint8_t rgb_array[][3] = {{25, 0, 0}, {0, 25, 0}, {0, 0, 25}, {10, 10, 10}, {0, 0, 50}, {0, 25, 0}};
 
         led_matrix_data_t new_data = {.ptr_index_array_leds_to_set = index_array,
                                       .ptr_rgb_array_leds_to_set = rgb_array,
@@ -38,17 +38,19 @@ void app_main(void)
 
         // updateLedMatrix(&new_data);
         updateLedMatrix(new_asteroid_data);
-        printf("new update\n");
-        printf("array length = %d\n", new_asteroid_data->array_length);
-        for (int i = 0; i < new_asteroid_data->array_length; i += 1)
-        {
-            printf("new_asteroid_data->array_index[%d] = %d\n", i, new_asteroid_data->ptr_index_array_leds_to_set[i]);
-        }
+        // printf("new update\n");
+        // printf("array length = %d\n", new_asteroid_data->array_length);
+        // for (int i = 0; i < new_asteroid_data->array_length; i += 1)
+        // {
+        //     printf("new_asteroid_data->array_index[%d] = %d\n", i, new_asteroid_data->ptr_index_array_leds_to_set[i]);
+        // }
 
+        free(new_asteroid_data->ptr_index_array_leds_to_set);
+        free(new_asteroid_data->ptr_rgb_array_leds_to_set);
         free(new_asteroid_data);
 
         // ESP_LOGW(TAG_MAIN, "Random Number = %ld\n", esp_random() % 1000);
 
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
