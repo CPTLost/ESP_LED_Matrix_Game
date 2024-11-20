@@ -16,9 +16,9 @@
 /*Maybe put into SDK config in the main project?*/
 
 /// Selection of the used led matrix hardware
-// #define MATRIX_32X32
+#define MATRIX_32X32
 // #define MATRIX_16X16
-#define MATRIX_5X5
+// #define MATRIX_5X5
 
 #ifdef MATRIX_5X5
 #define MATRIX_SIDE_LENGTH 5
@@ -35,6 +35,7 @@
 
 #define MAX_AST_OBJ_ALLOWED 64
 #define MAX_OFFSET 3
+#define MIN_OFFSET 2
 
 static const char *TAG = "ASTEROID_LOGIC";
 typedef struct _node_t
@@ -71,10 +72,10 @@ static block_t block_s = {.block_shape_array = block_s_shape_array, .array_size 
 static block_t block_m = {.block_shape_array = block_m_shape_array, .array_size = 2};
 static block_t block_l = {.block_shape_array = block_l_shape_array, .array_size = 2};
 #elif defined MATRIX_16X16
-static uint8_t block_s_shape_array[] = {2, 4, 4, 2};
-static uint8_t block_m_shape_array[] = {3, 5, 5, 3};
-static uint8_t block_l_shape_array[] = {4, 6, 6, 4};
-static block_t block_s = {.block_shape_array = block_s_shape_array, .array_size = 4};
+static uint8_t block_s_shape_array[] = {1, 3, 1};
+static uint8_t block_m_shape_array[] = {2, 4, 4, 2};
+static uint8_t block_l_shape_array[] = {3, 5, 5, 3};
+static block_t block_s = {.block_shape_array = block_s_shape_array, .array_size = 3};
 static block_t block_m = {.block_shape_array = block_m_shape_array, .array_size = 4};
 static block_t block_l = {.block_shape_array = block_l_shape_array, .array_size = 4};
 #elif defined MATRIX_32X32
@@ -237,7 +238,7 @@ led_matrix_data_t *updateAsteroidField()
     if (update_call_counter == row_offset)
     {
         update_call_counter = 0;
-        row_offset = esp_random() % MAX_OFFSET;
+        row_offset = MIN_OFFSET + (esp_random() % (MAX_OFFSET - MIN_OFFSET));
     }
     else
     {

@@ -16,9 +16,9 @@
 /*Maybe put into SDK config in the main project?*/
 
 /// Selection of the used led matrix hardware
-// #define MATRIX_32X32
+#define MATRIX_32X32
 // #define MATRIX_16X16
-#define MATRIX_5X5
+// #define MATRIX_5X5
 
 #define GPIO_PIN_LED_MATRIX 8
 
@@ -67,16 +67,25 @@ return_val_t initLedMatrix(void)
 
 #ifdef MATRIX_5X5
 
-return_val_t updateLedMatrix(led_matrix_data_t *new_data)
+return_val_t
+updateLedMatrix(led_matrix_data_t *new_data)
 {
-    led_strip_clear(led_matrix);
+    uint16_t index_array_to_delete[MATRIX_SIZE] = {0};
     for (uint16_t i = 0; i < new_data->array_length; i += 1)
     {
+        index_array_to_delete[new_data->ptr_index_array_leds_to_set[i]] = 1;
         led_strip_set_pixel(led_matrix,
                             new_data->ptr_index_array_leds_to_set[i],
                             new_data->ptr_rgb_array_leds_to_set[i][0],
                             new_data->ptr_rgb_array_leds_to_set[i][1],
                             new_data->ptr_rgb_array_leds_to_set[i][2]);
+    }
+    for (uint16_t i = 0; i < MATRIX_SIZE; i += 1)
+    {
+        if (0 == index_array_to_delete[i])
+        {
+            led_strip_set_pixel(led_matrix, new_data->ptr_index_array_leds_to_set[i], 0, 0, 0);
+        }
     }
     led_strip_refresh(led_matrix);
 
@@ -85,14 +94,14 @@ return_val_t updateLedMatrix(led_matrix_data_t *new_data)
 
 #endif
 
-#ifdef MATRIX_16x16
-static const uint16_t index_array_of_16x16_led_matrix[32 * 32] =
+#ifdef MATRIX_16X16
+static const uint16_t index_array_of_16x16_led_matrix[MATRIX_SIZE] =
     {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17,
      16, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52,
      51, 50, 49, 48, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 95, 94, 93, 92, 91, 90, 89, 88, 87,
      86, 85, 84, 83, 82, 81, 80, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 127, 126,
      125, 124, 123, 122, 121, 120, 119, 118, 117, 116, 115, 114, 113, 112, 128, 129, 130, 131, 132, 133, 134, 135, 136,
-     137, 138, 139, 140, 141, 142, 143, 159, 158, 157, 156, 155, 154, 153, 152, 151, 150, 149, 148, 147, 146, 145, 144 160,
+     137, 138, 139, 140, 141, 142, 143, 159, 158, 157, 156, 155, 154, 153, 152, 151, 150, 149, 148, 147, 146, 145, 144, 160,
      161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 191, 190, 189, 188, 187, 186, 185,
      184, 183, 182, 181, 180, 179, 178, 177, 176, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205,
      206, 207, 223, 222, 221, 220, 219, 218, 217, 216, 215, 214, 213, 212, 211, 210, 209, 208, 224, 225, 226, 227, 228,
@@ -101,14 +110,22 @@ static const uint16_t index_array_of_16x16_led_matrix[32 * 32] =
 
 return_val_t updateLedMatrix(led_matrix_data_t *new_data)
 {
-    led_strip_clear(led_matrix);
+    uint16_t index_array_to_delete[MATRIX_SIZE] = {0};
     for (uint16_t i = 0; i < new_data->array_length; i += 1)
     {
+        index_array_to_delete[new_data->ptr_index_array_leds_to_set[i]] = 1;
         led_strip_set_pixel(led_matrix,
                             index_array_of_16x16_led_matrix[new_data->ptr_index_array_leds_to_set[i]],
                             new_data->ptr_rgb_array_leds_to_set[i][0],
                             new_data->ptr_rgb_array_leds_to_set[i][1],
                             new_data->ptr_rgb_array_leds_to_set[i][2]);
+    }
+    for (uint16_t i = 0; i < MATRIX_SIZE; i += 1)
+    {
+        if (0 == index_array_to_delete[i])
+        {
+            led_strip_set_pixel(led_matrix, index_array_of_16x16_led_matrix[i], 0, 0, 0);
+        }
     }
     led_strip_refresh(led_matrix);
 
@@ -120,7 +137,7 @@ return_val_t updateLedMatrix(led_matrix_data_t *new_data)
 #ifdef MATRIX_32X32
 
 /// Lookup Tabel for the actual physical LED index in the 32x32 LED Matrix
-static const uint16_t index_array_of_32x32_led_matrix[32 * 32] =
+static const uint16_t index_array_of_32x32_led_matrix[MATRIX_SIZE] =
     {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 256, 257, 258, 259,
      260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17,
      16, 287, 286, 285, 284, 283, 282, 281, 280, 279, 278, 277, 276, 275, 274, 273, 272, 32, 33, 34, 35, 36, 37, 38, 39, 40,
@@ -167,15 +184,27 @@ static const uint16_t index_array_of_32x32_led_matrix[32 * 32] =
 
 return_val_t updateLedMatrix(led_matrix_data_t *new_data)
 {
-    led_strip_clear(led_matrix);
+    // led_strip_clear(led_matrix);
+
+    uint16_t index_array_to_delete[MATRIX_SIZE] = {0};
+
     for (uint16_t i = 0; i < new_data->array_length; i += 1)
     {
+        index_array_to_delete[new_data->ptr_index_array_leds_to_set[i]] = 1;
         led_strip_set_pixel(led_matrix,
                             index_array_of_32x32_led_matrix[new_data->ptr_index_array_leds_to_set[i]],
                             new_data->ptr_rgb_array_leds_to_set[i][0],
                             new_data->ptr_rgb_array_leds_to_set[i][1],
                             new_data->ptr_rgb_array_leds_to_set[i][2]);
     }
+    for (uint16_t i = 0; i < MATRIX_SIZE; i += 1)
+    {
+        if (0 == index_array_to_delete[i])
+        {
+            led_strip_set_pixel(led_matrix, index_array_of_32x32_led_matrix[i], 0, 0, 0);
+        }
+    }
+
     led_strip_refresh(led_matrix);
 
     return SUCCESS;
