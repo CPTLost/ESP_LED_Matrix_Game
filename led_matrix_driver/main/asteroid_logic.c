@@ -6,29 +6,35 @@
 #include <esp_log.h>
 #include <esp_random.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "led_matrix_driver.h"
 #include "return_val.h"
 
+#define ARRAY_LENGTH(x) sizeof(x) / sizeof(x[0])
+
 /*Maybe put into SDK config in the main project?*/
 
 /// Selection of the used led matrix hardware
-#define MATRIX_32X32
+// #define MATRIX_32X32
 // #define MATRIX_16X16
-// #define MATRIX_5X5
+#define MATRIX_5X5
 
 #ifdef MATRIX_5X5
 #define MATRIX_SIDE_LENGTH 5
 #define MAX_INDEX 24
-#endif
-#ifdef MATRIX_16X16
+#elif defined MATRIX_16X16
 #define MATRIX_SIDE_LENGTH 16
 #define MAX_INDEX 255
-#endif
-#ifdef MATRIX_32X32
+#elif defined MATRIX_32X32
 #define MATRIX_SIDE_LENGTH 32
 #define MAX_INDEX 1023
+#else
+#error "Unknown MATRIX_SIZE"
 #endif
+
+#define MAX_AST_OBJ_ALLOWED 64
+#define MAX_OFFSET 3
 
 static const char *TAG = "ASTEROID_LOGIC";
 typedef struct _node_t
@@ -44,9 +50,55 @@ typedef struct
     uint32_t size;
 } list_t;
 
-static uint8_t asteroids_per_row = 2;
+typedef struct
+{
+    uint8_t *block_shape_array;
+    uint8_t array_size;
+} block_t;
+
+typedef struct
+{
+    block_t *block;
+    uint8_t call_counter;
+    uint16_t start_index;
+} asteroid_t;
+
+#ifdef MATRIX_5X5
+static uint8_t block_s_shape_array[] = {1};
+static uint8_t block_m_shape_array[] = {2, 2};
+static uint8_t block_l_shape_array[] = {3, 3};
+static block_t block_s = {.block_shape_array = block_s_shape_array, .array_size = 1};
+static block_t block_m = {.block_shape_array = block_m_shape_array, .array_size = 2};
+static block_t block_l = {.block_shape_array = block_l_shape_array, .array_size = 2};
+#elif defined MATRIX_16X16
+static uint8_t block_s_shape_array[] = {2, 4, 4, 2};
+static uint8_t block_m_shape_array[] = {3, 5, 5, 3};
+static uint8_t block_l_shape_array[] = {4, 6, 6, 4};
+static block_t block_s = {.block_shape_array = block_s_shape_array, .array_size = 4};
+static block_t block_m = {.block_shape_array = block_m_shape_array, .array_size = 4};
+static block_t block_l = {.block_shape_array = block_l_shape_array, .array_size = 4};
+#elif defined MATRIX_32X32
+static uint8_t block_s_shape_array[] = {2, 4, 4, 2};
+static uint8_t block_m_shape_array[] = {3, 5, 5, 3};
+static uint8_t block_l_shape_array[] = {4, 6, 6, 4};
+static block_t block_s = {.block_shape_array = block_s_shape_array, .array_size = 4};
+static block_t block_m = {.block_shape_array = block_m_shape_array, .array_size = 4};
+static block_t block_l = {.block_shape_array = block_l_shape_array, .array_size = 4};
+#else
+#error "Unknown BLOCK_TYPE"
+#endif
+
+static asteroid_t **asteroid_objects = NULL;
 static list_t asteroid_indices_list = {0};
 static node_t *current_node_ptr = NULL;
+
+static const block_t *block_type_array[] = {&block_s, &block_m, &block_l};
+
+static uint8_t row_offset = 0;
+
+static uint8_t objects_created_counter = 0;
+static uint8_t update_call_counter = 0;
+
 static uint32_t sum_of_array_lengths = 0;
 
 typedef void (*nodeCallback)(node_t *node, uint8_t node_position);
@@ -57,7 +109,7 @@ static return_val_t insertAtEnd_circular(list_t *p_list, uint32_t *array, uint8_
     node_t *new_node = malloc(sizeof(node_t));
     if (NULL == new_node)
     {
-        printf("\nMemory allocation failed\n");
+        printf("\nMemory allocation failed while creating:\nnew_node\n");
         return MEM_ALLOC_ERROR;
     }
 
@@ -152,52 +204,179 @@ void circular_linked_list_test()
 /// THE USER MUST DEALLOCATE THE RETURNED DATA WHEN NOT USED ANYMORE
 led_matrix_data_t *updateAsteroidField()
 {
-    /// First part of update is getting valid random indices and adding them to the circular linked list ///
-    // uint32_t start_index_array[asteroids_per_row];
-    uint32_t *start_index_array;
-    if (NULL == (start_index_array = malloc(sizeof(*start_index_array) * asteroids_per_row)))
+    /// Init of asteroid_objects
+    if (NULL == asteroid_objects)
     {
-        ESP_LOGE(TAG, "Memory allocation failed!\n");
-        return MEM_ALLOC_ERROR;
-    }
-
-    /// For the first update it is not necessary to check if the random values are valid
-    if (0 == asteroid_indices_list.size)
-    {
-        /// creates random start indices
-        for (uint8_t i = 0; i < asteroids_per_row; i += 1)
+        if (NULL == (asteroid_objects = malloc(sizeof(asteroid_t *))))
         {
-            /// The esp_random() automatically waits until enough entropy has gathered to return a new random number
-            start_index_array[i] = MAX_INDEX - esp_random() % MATRIX_SIDE_LENGTH;
+            ESP_LOGE(TAG, "Memory allocation failed while creating:\nasteroid_objects\n");
         }
     }
-    /// For every update except the first it is necessary to check if random values are valid
-    /// That means the new value must not be directly behind the last value and there must be a possible path to take for the player
+    bool new_asteroid_created = false;
+    asteroid_t *new_asteroid = NULL;
+
+    /// Checks if new objects should be created, the update should wait for row_offset number of calls before creating new obj
+    if (update_call_counter == 0)
+    {
+        /// create asteroid object and init it with a random block
+        objects_created_counter += 1;
+
+        if (NULL == (asteroid_objects = realloc(asteroid_objects, sizeof(asteroid_t *) * objects_created_counter)) ||
+            NULL == (new_asteroid = malloc(sizeof(asteroid_t))))
+        {
+            ESP_LOGE(TAG, "Memory allocation failed while creating:\nasteroid_objects\nnew_asteroid\n");
+        }
+        new_asteroid_created = true;
+        new_asteroid->call_counter = 0;
+        new_asteroid->start_index = NULL;
+
+        new_asteroid->block = block_type_array[esp_random() % ARRAY_LENGTH(block_type_array)];
+
+        asteroid_objects[objects_created_counter - 1] = new_asteroid;
+    }
+    if (update_call_counter == row_offset)
+    {
+        update_call_counter = 0;
+        row_offset = esp_random() % MAX_OFFSET;
+    }
     else
     {
-        // here comes validity check code ....
-        // for now its ignored
-        for (uint8_t i = 0; i < asteroids_per_row; i += 1)
+        update_call_counter += 1;
+    }
+
+    /// calc index array size
+    uint32_t index_array_size = 0;
+    uint8_t expired_object_list[MAX_AST_OBJ_ALLOWED] = {0};
+    uint8_t amount_of_expired_objects = 0;
+    for (uint8_t i = 0; i < objects_created_counter; i += 1)
+    {
+        if (asteroid_objects[i]->call_counter < asteroid_objects[i]->block->array_size)
         {
-            start_index_array[i] = MAX_INDEX - esp_random() % MATRIX_SIDE_LENGTH;
+            index_array_size += asteroid_objects[i]->block->block_shape_array[asteroid_objects[i]->call_counter];
+            asteroid_objects[i]->call_counter += 1;
+        }
+        else
+        {
+            expired_object_list[i] = 1;
+            amount_of_expired_objects += 1;
         }
     }
-    // array_length for more than one LED must be changed !!!
 
-    // Checking if max ring buffer size is reached (= MATRIX_SIDE_LENGTH)
+    /// Updating the asteroid_object array, removing expired ones
+    asteroid_t **updated_asteroid_objects = NULL;
+    if ((objects_created_counter - amount_of_expired_objects) >= 1)
+    {
+        // assert(objects_created_counter - amount_of_expired_objects >= 1);
+        if (NULL == (updated_asteroid_objects = malloc(sizeof(asteroid_t *) * (objects_created_counter - amount_of_expired_objects))))
+        {
+            ESP_LOGE(TAG, "Memory allocation failed while creating:\nupdated_asteroid_objects\n");
+            return MEM_ALLOC_ERROR;
+        }
+
+        uint8_t updated_index_counter = 0;
+        for (uint8_t i = 0; i < objects_created_counter; i += 1)
+        {
+            if (1 != expired_object_list[i])
+            {
+                updated_asteroid_objects[updated_index_counter] = asteroid_objects[i];
+                updated_index_counter += 1;
+            }
+            else
+            {
+                free(asteroid_objects[i]);
+            }
+        }
+        free(asteroid_objects);
+        objects_created_counter -= amount_of_expired_objects;
+        asteroid_objects = updated_asteroid_objects;
+    }
+    else
+    {
+        for (uint8_t i = 0; i < objects_created_counter; i += 1)
+        {
+            free(asteroid_objects[i]);
+        }
+        free(asteroid_objects);
+        objects_created_counter = 0;
+        /// It should be okay to assign NULL because it is asteroid objects is only accessed in loops with the
+        /// iterator beeing objects_created_counter this is set to 0 -> loops dont execute
+        /// And because its NULL in the next updated call it will be initilaised again
+        asteroid_objects = NULL;
+    }
+
+    /// Creating the index_array which will be added to a node
+    uint32_t *index_array = NULL;
+    if (0 != objects_created_counter)
+    {
+        if (NULL == (index_array = malloc(sizeof(*index_array) * index_array_size)))
+        {
+            ESP_LOGE(TAG, "Memory allocation failed while creating:\nindex_array\n");
+            return MEM_ALLOC_ERROR;
+        }
+    }
+
+    /// assigns random start positions to the new asteroid object
+    if (true == new_asteroid_created)
+    {
+        for (uint8_t i = 0; i < objects_created_counter; i += 1)
+        {
+            if (NULL == asteroid_objects[i]->start_index)
+            {
+                asteroid_objects[i]->start_index = MAX_INDEX - esp_random() % MATRIX_SIDE_LENGTH;
+            }
+        }
+    }
+
+    /// Function to set proper asteroid pixel values with randomly generated start_index
+    uint8_t values_added_counter = 0;
+    for (uint8_t i = 0; i < objects_created_counter; i += 1)
+    {
+        uint8_t current_asteroid_block_shape_value = asteroid_objects[i]->block->block_shape_array[asteroid_objects[i]->call_counter - 1];
+        index_array[values_added_counter] = asteroid_objects[i]->start_index;
+        values_added_counter += 1;
+        if (0 == current_asteroid_block_shape_value % 2)
+        {
+            for (uint8_t j = 0; j < (current_asteroid_block_shape_value / 2); j += 1)
+            {
+                index_array[values_added_counter] =
+                    (MAX_INDEX >= asteroid_objects[i]->start_index + j + 1) ? asteroid_objects[i]->start_index + j + 1 : MAX_INDEX;
+                values_added_counter += 1;
+            }
+            for (uint8_t j = 1; j < (current_asteroid_block_shape_value / 2); j += 1)
+            {
+                index_array[values_added_counter] =
+                    (MAX_INDEX - MATRIX_SIDE_LENGTH < asteroid_objects[i]->start_index - j) ? asteroid_objects[i]->start_index - j : MAX_INDEX - (MATRIX_SIDE_LENGTH - 1);
+                values_added_counter += 1;
+            }
+        }
+        else
+        {
+            for (uint8_t j = 0; j < (current_asteroid_block_shape_value / 2); j += 1)
+            {
+                index_array[values_added_counter] =
+                    (MAX_INDEX >= asteroid_objects[i]->start_index + j + 1) ? asteroid_objects[i]->start_index + j + 1 : MAX_INDEX;
+                values_added_counter += 1;
+                index_array[values_added_counter] =
+                    (MAX_INDEX - MATRIX_SIDE_LENGTH < asteroid_objects[i]->start_index - j - 1) ? asteroid_objects[i]->start_index - j - 1 : MAX_INDEX - (MATRIX_SIDE_LENGTH - 1);
+                values_added_counter += 1;
+            }
+        }
+    }
+
+    /// Checking if max ring buffer size is reached (= MATRIX_SIDE_LENGTH)
     if (MATRIX_SIDE_LENGTH > asteroid_indices_list.size)
     {
-        insertAtEnd_circular(&asteroid_indices_list, start_index_array, asteroids_per_row); // asteroids per row is not ideal for more than one LED sized asteroid...
+        insertAtEnd_circular(&asteroid_indices_list, index_array, index_array_size); // asteroids per row is not ideal for more than one LED sized asteroid...
         /// current_ptr corresponds to the Tail of the list inside this if statement
         traversList_once(&asteroid_indices_list, getCurrentPtr);
     }
     else
     {
         current_node_ptr = current_node_ptr->p_next;
-        /// deallocate previously allocated memory for the start index and set it to the new allocated start_index_array
+        /// deallocate previously allocated memory for the start index and set it to the new allocated index_array
         free(current_node_ptr->array);
-        current_node_ptr->array = start_index_array;
-        current_node_ptr->array_length = asteroids_per_row; // asteroids per row is not ideal for more than one LED sized asteroid..........
+        current_node_ptr->array = index_array;
+        current_node_ptr->array_length = index_array_size;
     }
 
     /// Second part of the update function is to generate the return data as led_matrix_data_t ///
@@ -215,14 +394,21 @@ led_matrix_data_t *updateAsteroidField()
         NULL == (ptr_rgb_array = malloc(sizeof(**ptr_rgb_array) * sizeof(*ptr_rgb_array) * index_array_length)) ||
         NULL == (matrix_data = malloc(sizeof(*matrix_data))))
     {
-        ESP_LOGE(TAG, "Memory allocation failed!\n");
+        ESP_LOGE(TAG, "Memory allocation failed while creating:\nptr_index_array\nptr_rgb_array\nmatrix_data");
         return MEM_ALLOC_ERROR;
     }
 
     /// Decrementing (coz Top to Bottom) the indices by the matrix side length -> asteriods fall to next row
+    /// The counter = 1 and current_ptr = p_next is because the tail node (= current ptr) does not need to be decremented
+    /// if there is no new index data
     uint8_t counter = 1;
     node_t *current_ptr = current_node_ptr->p_next;
-    while (counter < asteroid_indices_list.size && 1 != asteroid_indices_list.size)
+    if (0 == index_array_size)
+    {
+        counter = 0;
+        current_ptr = current_node_ptr;
+    }
+    while (counter < asteroid_indices_list.size)
     {
         for (uint8_t i = 0; i < current_ptr->array_length; i += 1)
         {
@@ -232,18 +418,19 @@ led_matrix_data_t *updateAsteroidField()
         counter += 1;
     }
 
-    /// Traversing list and copying all list arrays to index_array
+    /// Traversing list and copying all list arrays to the ptr_index_array
+    uint8_t elements_added_counter = 0;
     counter = 0;
-    node_t *p_current = asteroid_indices_list.p_head;
+    current_ptr = asteroid_indices_list.p_head;
     while (counter < asteroid_indices_list.size)
     {
-        uint8_t array_length = p_current->array_length;
+        uint8_t array_length = current_ptr->array_length;
         for (uint8_t i = 0; i < array_length; i += 1)
         {
-            ptr_index_array[counter * array_length + i] = p_current->array[i];
+            ptr_index_array[elements_added_counter] = current_ptr->array[i];
+            elements_added_counter += 1;
         }
-
-        p_current = p_current->p_next;
+        current_ptr = current_ptr->p_next;
         counter += 1;
     }
 

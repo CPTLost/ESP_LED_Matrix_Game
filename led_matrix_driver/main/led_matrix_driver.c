@@ -16,9 +16,9 @@
 /*Maybe put into SDK config in the main project?*/
 
 /// Selection of the used led matrix hardware
-#define MATRIX_32X32
+// #define MATRIX_32X32
 // #define MATRIX_16X16
-// #define MATRIX_5X5
+#define MATRIX_5X5
 
 #define GPIO_PIN_LED_MATRIX 8
 
