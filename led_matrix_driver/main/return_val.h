@@ -10,7 +10,8 @@ typedef enum
     SUCCESS = 0,
     GENERIC_ERROR,
     ALREADY_CONFIGURED,
-    MEM_ALLOC_ERROR
+    MEM_ALLOC_ERROR,
+    NULL_DATA,
 
 } return_val_t;
 

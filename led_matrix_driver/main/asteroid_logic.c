@@ -13,26 +13,6 @@
 
 #define ARRAY_LENGTH(x) sizeof(x) / sizeof(x[0])
 
-/*Maybe put into SDK config in the main project?*/
-
-/// Selection of the used led matrix hardware
-#define MATRIX_32X32
-// #define MATRIX_16X16
-// #define MATRIX_5X5
-
-#ifdef MATRIX_5X5
-#define MATRIX_SIDE_LENGTH 5
-#define MAX_INDEX 24
-#elif defined MATRIX_16X16
-#define MATRIX_SIDE_LENGTH 16
-#define MAX_INDEX 255
-#elif defined MATRIX_32X32
-#define MATRIX_SIDE_LENGTH 32
-#define MAX_INDEX 1023
-#else
-#error "Unknown MATRIX_SIZE"
-#endif
-
 #define MAX_AST_OBJ_ALLOWED 64
 #define MAX_OFFSET 3
 #define MIN_OFFSET 2
