@@ -5,14 +5,223 @@
 #include <stdbool.h>
 #include <esp_log.h>
 #include <assert.h>
+#include <limits.h>
+
+#include "return_val.h"
 
 #define NUMBER_OF_POSSIBLE_COLLISION_POINTS 4 // This is determined by the player model and size
 
 static const char *TAG = "GAME_LOGIC";
 static bool g_game_lost = false;
 
-led_matrix_data_t *updateGame(led_matrix_data_t *asteroid_data, led_matrix_data_t *player_data, uint8_t shot_fired_flag)
+static uint16_t *shot_asteroids_indices = NULL;
+static uint16_t amount_of_shot_asteroids_indices = 0;
+
+static return_val_t fillReturnArrays(uint16_t combined_array_length, led_matrix_data_t *asteroid_data, uint16_t *ptr_index_array,
+                                     uint8_t (*ptr_rgb_array)[3], shot_data_t **shot_data_array, uint8_t shot_data_array_size,
+                                     uint16_t shot_data_indices_array_size, player_data_t *player_data, uint8_t collision_rgb_value[],
+                                     uint8_t collision_counter, uint16_t collision_index_array[])
 {
+    uint8_t shot_array_counter = 0;
+    uint8_t shot_index_counter = 0;
+    for (uint16_t i = 0; i < combined_array_length; i += 1)
+    {
+        /// inserting all asteroid indices
+        if (i < asteroid_data->array_length)
+        {
+            ptr_index_array[i] = asteroid_data->ptr_index_array_leds_to_set[i];
+            for (uint8_t j = 0; j < 3; j += 1)
+            {
+                ptr_rgb_array[i][j] = asteroid_data->ptr_rgb_array_leds_to_set[i][j];
+            }
+        }
+        /// overwriting all shot asteroid indices with rgb values 0
+        else if (i < asteroid_data->array_length + amount_of_shot_asteroids_indices)
+        {
+            ptr_index_array[i] = shot_asteroids_indices[i - asteroid_data->array_length];
+            for (uint8_t j = 0; j < 3; j += 1)
+            {
+                ptr_rgb_array[i][j] = 0;
+            }
+        }
+        /// inserting player data
+        else if (i < asteroid_data->array_length + amount_of_shot_asteroids_indices + player_data->array_size)
+        {
+            ptr_index_array[i] = player_data->player_index_array[i - (asteroid_data->array_length + amount_of_shot_asteroids_indices)];
+            for (uint8_t j = 0; j < 3; j += 1)
+            {
+                ptr_rgb_array[i][j] = player_data->player_type->player_rgb_values[j];
+            }
+        }
+        /// inserting shot data
+        else if (i < asteroid_data->array_length + amount_of_shot_asteroids_indices + player_data->array_size + shot_data_indices_array_size)
+        {
+            bool value_added = false;
+            while (false == value_added && (shot_array_counter < shot_data_array_size))
+            {
+                if (shot_index_counter < shot_data_array[shot_array_counter]->array_size)
+                {
+                    if (false == (shot_data_array[shot_array_counter]->shot_hit_smth_array[shot_index_counter]))
+                    {
+                        ptr_index_array[i] = shot_data_array[shot_array_counter]->shot_index_array[shot_index_counter];
+                        for (uint8_t j = 0; j < 3; j += 1)
+                        {
+                            ptr_rgb_array[i][j] = shot_data_array[shot_array_counter]->shot_type->shot_rgb_values[j];
+                        }
+                        value_added = true;
+                    }
+                    shot_index_counter += 1;
+                }
+                else
+                {
+                    shot_array_counter += 1;
+                    if (shot_array_counter < shot_data_array_size)
+                    {
+                        shot_index_counter = 0;
+                        if (false == (shot_data_array[shot_array_counter]->shot_hit_smth_array[shot_index_counter]))
+                        {
+                            ptr_index_array[i] = shot_data_array[shot_array_counter]->shot_index_array[shot_index_counter];
+                            for (uint8_t j = 0; j < 3; j += 1)
+                            {
+                                ptr_rgb_array[i][j] = shot_data_array[shot_array_counter]->shot_type->shot_rgb_values[j];
+                            }
+                            value_added = true;
+                        }
+                        shot_index_counter += 1;
+                    }
+                }
+            }
+        }
+    }
+    for (uint8_t i = 0; i < collision_counter; i += 1)
+    {
+        ptr_index_array[combined_array_length - 1 - i] = collision_index_array[i];
+        for (uint8_t j = 0; j < 3; j += 1)
+        {
+            ptr_rgb_array[combined_array_length - 1 - i][j] = collision_rgb_value[j];
+        }
+    }
+    return SUCCESS;
+}
+
+static return_val_t updateShotAsteroidIndices(bool new_asteroid_data, led_matrix_data_t *asteroid_data)
+{
+    if (true == new_asteroid_data && 0 != amount_of_shot_asteroids_indices)
+    {
+        /// Decrement the previously shot asteroid indices (asteroids fall down) and NULLs expired indices
+        uint16_t amount_of_expired_shot_asteroids_indices = 0;
+        for (uint16_t i = 0; i < amount_of_shot_asteroids_indices; i += 1)
+        {
+
+            if (0 <= (shot_asteroids_indices[i] - MATRIX_SIDE_LENGTH))
+            {
+                shot_asteroids_indices[i] -= MATRIX_SIDE_LENGTH;
+            }
+            else
+            {
+                amount_of_expired_shot_asteroids_indices += 1;
+                shot_asteroids_indices[i] = NULL;
+            }
+        }
+        if (0 < (amount_of_shot_asteroids_indices - amount_of_expired_shot_asteroids_indices))
+        {
+            /// creating new array without the expired indices
+            uint16_t *updated_shot_asteroids_indices;
+            if (NULL == (updated_shot_asteroids_indices =
+                             malloc(sizeof(*updated_shot_asteroids_indices) * (amount_of_shot_asteroids_indices - amount_of_expired_shot_asteroids_indices))))
+            {
+                ESP_LOGE(TAG, "Memory allocation failed while creating:\nupdated_shot_asteroids_indices\n");
+                return MEM_ALLOC_ERROR;
+            }
+            /// looping through old array and copying valid data to new array
+            uint16_t counter = 0;
+            for (uint16_t i = 0; i < amount_of_shot_asteroids_indices; i += 1)
+            {
+                if (NULL != shot_asteroids_indices[i])
+                {
+                    updated_shot_asteroids_indices[counter] = shot_asteroids_indices[i];
+                    counter += 1;
+                }
+            }
+            free(shot_asteroids_indices);
+            amount_of_shot_asteroids_indices -= amount_of_expired_shot_asteroids_indices;
+            shot_asteroids_indices = updated_shot_asteroids_indices;
+        }
+        else
+        {
+            amount_of_shot_asteroids_indices = 0;
+            free(shot_asteroids_indices);
+            shot_asteroids_indices = NULL;
+        }
+    }
+    return SUCCESS;
+}
+
+static return_val_t checkShotAsteroidCollision(bool set_asteroid_indices[], led_matrix_data_t *asteroid_data, shot_data_t **shot_data_array, uint8_t shot_data_array_size)
+{
+    if ((0 != shot_data_array_size) && (0 != asteroid_data->array_length))
+    {
+        uint16_t *new_shot_asteroids_indices;
+        if (NULL == (new_shot_asteroids_indices = malloc(sizeof(*new_shot_asteroids_indices) * asteroid_data->array_length)))
+        {
+            ESP_LOGE(TAG, "Memory allocation failed while creating:\nnew_shot_asteroids_indices\n");
+            return MEM_ALLOC_ERROR;
+        }
+
+        /// checks shot and asteroid collision and saves hit asteroid index
+        uint8_t counter = 0;
+        for (uint16_t i = 0; i < shot_data_array_size; i += 1)
+        {
+            for (uint16_t j = 0; j < shot_data_array[i]->array_size; j += 1)
+            {
+                if ((true == set_asteroid_indices[shot_data_array[i]->shot_index_array[j]]) &&
+                    (false == shot_data_array[i]->shot_hit_smth_array[j]))
+                {
+                    new_shot_asteroids_indices[counter] = shot_data_array[i]->shot_index_array[j];
+                    shot_data_array[i]->shot_hit_smth_array[j] = true;
+                    ESP_LOGW(TAG, "\n Hit smth !\n");
+                    counter += 1;
+                    set_asteroid_indices[shot_data_array[i]->shot_index_array[j]] = false;
+                    amount_of_shot_asteroids_indices += 1;
+                }
+            }
+        }
+
+        if (0 < amount_of_shot_asteroids_indices)
+        {
+            if (NULL != shot_asteroids_indices)
+            {
+                if (NULL == (shot_asteroids_indices = realloc(shot_asteroids_indices, sizeof(*shot_asteroids_indices) * amount_of_shot_asteroids_indices)))
+                {
+                    ESP_LOGE(TAG, "Memory reallocation failed while reallocating:\nshot_asteroids_indices\n");
+                    return MEM_ALLOC_ERROR;
+                }
+            }
+            else
+            {
+                if (NULL == (shot_asteroids_indices = malloc(sizeof(*shot_asteroids_indices) * amount_of_shot_asteroids_indices)))
+                {
+                    ESP_LOGE(TAG, "Memory allocation failed while:\nshot_asteroids_indices\n");
+                    return MEM_ALLOC_ERROR;
+                }
+            }
+            /// copying new_shot_asteroids_indices into newly reallocated shot_asteroids_indices
+            for (uint16_t i = 0; i < counter; i += 1)
+            {
+                shot_asteroids_indices[amount_of_shot_asteroids_indices - counter + i] = new_shot_asteroids_indices[i];
+            }
+            free(new_shot_asteroids_indices);
+            new_shot_asteroids_indices = NULL;
+            /// shot_asteroids_indices contains now all indices that must not be set later int the return data
+        }
+    }
+    return SUCCESS;
+}
+
+led_matrix_data_t *updateGame(led_matrix_data_t *asteroid_data, bool new_asteroid_data,
+                              player_data_t *player_data, shot_data_t **shot_data_array, uint8_t shot_data_array_size)
+{
+    /// checks for valid inputs
     if (true == g_game_lost)
     {
         ESP_LOGI(TAG, "GAME OVER\n");
@@ -30,32 +239,88 @@ led_matrix_data_t *updateGame(led_matrix_data_t *asteroid_data, led_matrix_data_
         return NULL_DATA;
     }
 
+    if ((NULL == shot_asteroids_indices) && (0 != asteroid_data->array_length))
+    {
+        shot_asteroids_indices = malloc(sizeof(*shot_asteroids_indices) * asteroid_data->array_length);
+    }
+
+    updateShotAsteroidIndices(new_asteroid_data, asteroid_data);
+
+    /// Maps asteroids positions on a Matrix with bool values
     bool set_asteroid_indices[MATRIX_SIZE] = {0};
-    uint16_t collision_index_array[NUMBER_OF_POSSIBLE_COLLISION_POINTS] = {0};
-    uint8_t collision_counter = 0;
     for (uint16_t i = 0; i < (asteroid_data->array_length); i += 1)
     {
         set_asteroid_indices[asteroid_data->ptr_index_array_leds_to_set[i]] = true;
     }
-    for (uint16_t i = 0; i < (player_data->array_length); i += 1)
+    for (uint16_t i = 0; i < amount_of_shot_asteroids_indices; i += 1)
     {
-        if (true == set_asteroid_indices[player_data->ptr_index_array_leds_to_set[i]])
+        set_asteroid_indices[shot_asteroids_indices[i]] = false;
+    }
+
+    checkShotAsteroidCollision(set_asteroid_indices, asteroid_data, shot_data_array, shot_data_array_size);
+
+    /// Increments all shot positions (shots go up)
+    for (uint16_t i = 0; i < shot_data_array_size; i += 1)
+    {
+        for (uint16_t j = 0; j < shot_data_array[i]->array_size; j += 1)
+        {
+            if (false == shot_data_array[i]->shot_hit_smth_array[j])
+            {
+                /// checks if shot is out of bounds, when true shot is marked as "hit_smth"
+                if (MATRIX_SIZE > (shot_data_array[i]->shot_index_array[j] + MATRIX_SIDE_LENGTH))
+                {
+                    shot_data_array[i]->shot_index_array[j] += MATRIX_SIDE_LENGTH;
+                }
+                else
+                {
+                    shot_data_array[i]->shot_hit_smth_array[j] = true;
+                }
+            }
+        }
+    }
+
+    checkShotAsteroidCollision(set_asteroid_indices, asteroid_data, shot_data_array, shot_data_array_size);
+
+    /// compares asteroid positions with player position -> looks for collisions
+    uint16_t collision_index_array[NUMBER_OF_POSSIBLE_COLLISION_POINTS] = {0};
+    uint8_t collision_counter = 0;
+    for (uint16_t i = 0; i < (player_data->array_size); i += 1)
+    {
+        if (true == set_asteroid_indices[player_data->player_index_array[i]])
         {
             g_game_lost = true;
-            collision_index_array[collision_counter] = player_data->ptr_index_array_leds_to_set[i];
+            collision_index_array[collision_counter] = player_data->player_index_array[i];
             collision_counter += 1;
         }
     }
 
+    /// getting the sum of all array sizes of the shots
+    uint16_t shot_data_indices_array_size = 0;
+    for (uint16_t i = 0; i < shot_data_array_size; i += 1)
+    {
+        for (uint16_t j = 0; j < shot_data_array[i]->array_size; j += 1)
+        {
+            if (false == shot_data_array[i]->shot_hit_smth_array[j])
+            {
+                shot_data_indices_array_size += 1;
+            }
+        }
+    }
+
     assert(collision_counter <= NUMBER_OF_POSSIBLE_COLLISION_POINTS);
+    assert(asteroid_data->array_length +
+               player_data->array_size +
+               shot_data_indices_array_size +
+               collision_counter +
+               amount_of_shot_asteroids_indices <
+           UINT16_MAX);
 
-    // temp //
-    bool shot_active = false;
-    uint8_t size_of_shot = 2;
-    /////////
-
-    uint16_t combined_array_length = asteroid_data->array_length + player_data->array_length +
-                                     ((shot_active) ? size_of_shot : 0) + ((0 != collision_counter) ? collision_counter : 0);
+    /// Creating led_matrix_data to return
+    uint16_t combined_array_length = asteroid_data->array_length +
+                                     player_data->array_size +
+                                     shot_data_indices_array_size +
+                                     collision_counter +
+                                     amount_of_shot_asteroids_indices;
 
     led_matrix_data_t *matrix_data;
     uint16_t *ptr_index_array;
@@ -69,48 +334,15 @@ led_matrix_data_t *updateGame(led_matrix_data_t *asteroid_data, led_matrix_data_
         return MEM_ALLOC_ERROR;
     }
 
-    for (uint16_t i = 0; i < combined_array_length; i += 1)
-    {
-        if (i < asteroid_data->array_length)
-        {
-            ptr_index_array[i] = asteroid_data->ptr_index_array_leds_to_set[i];
-            for (uint8_t j = 0; j < 3; j += 1)
-            {
-                ptr_rgb_array[i][j] = asteroid_data->ptr_rgb_array_leds_to_set[i][j];
-            }
-        }
-        else if (i < asteroid_data->array_length + player_data->array_length)
-        {
-            ptr_index_array[i] = player_data->ptr_index_array_leds_to_set[i - asteroid_data->array_length];
-            for (uint8_t j = 0; j < 3; j += 1)
-            {
-                ptr_rgb_array[i][j] = player_data->ptr_rgb_array_leds_to_set[i - asteroid_data->array_length][j];
-            }
-        }
+    uint8_t collision_rgb_value[3] = {20, 5, 20};
 
-        ////////// SHOT DATA MUST LATER BE ADDED HERE/////////
-    }
-
-    uint8_t collision_rgb_value[3] = {23, 13, 23};
-
-    for (uint8_t i = 0; i < collision_counter; i += 1)
-    {
-        ptr_index_array[combined_array_length - 1 - i] = collision_index_array[i];
-        for (uint8_t j = 0; j < 3; j += 1)
-        {
-            ptr_rgb_array[combined_array_length - 1 - i][j] = collision_rgb_value[j];
-        }
-    }
+    fillReturnArrays(combined_array_length, asteroid_data, ptr_index_array, ptr_rgb_array, shot_data_array,
+                     shot_data_array_size, shot_data_indices_array_size, player_data, collision_rgb_value,
+                     collision_counter, collision_index_array);
 
     matrix_data->ptr_index_array_leds_to_set = ptr_index_array;
     matrix_data->ptr_rgb_array_leds_to_set = ptr_rgb_array;
     matrix_data->array_length = combined_array_length;
-
-    // ESP_LOGW(TAG, "asteroid data length = %d", asteroid_data->array_length);
-    // ESP_LOGW(TAG, "player data length = %d", player_data->array_length);
-    // ESP_LOGW(TAG, "collision counter = %d", collision_counter);
-    // ESP_LOGW(TAG, "combined_array_length = %d", combined_array_length);
-    // ESP_LOGW(TAG, "matrix_data array length = %d\n", matrix_data->array_length);
 
     /// THE USER MUST DEALLOCATE THE RETURNED DATA WHEN NOT USED ANYMORE
     return matrix_data;

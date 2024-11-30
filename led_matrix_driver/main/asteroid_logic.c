@@ -45,29 +45,24 @@ typedef struct
 } asteroid_t;
 
 #ifdef MATRIX_5X5
-static uint8_t block_s_shape_array[] = {1};
-static uint8_t block_m_shape_array[] = {2, 2};
-static uint8_t block_l_shape_array[] = {3, 3};
-static block_t block_s = {.block_shape_array = block_s_shape_array, .array_size = 1};
-static block_t block_m = {.block_shape_array = block_m_shape_array, .array_size = 2};
-static block_t block_l = {.block_shape_array = block_l_shape_array, .array_size = 2};
+static const uint8_t block_s_shape_array[] = {1};
+static const uint8_t block_m_shape_array[] = {2, 2};
+static const uint8_t block_l_shape_array[] = {3, 3};
 #elif defined MATRIX_16X16
-static uint8_t block_s_shape_array[] = {1, 3, 1};
-static uint8_t block_m_shape_array[] = {2, 4, 4, 2};
-static uint8_t block_l_shape_array[] = {3, 5, 5, 3};
-static block_t block_s = {.block_shape_array = block_s_shape_array, .array_size = 3};
-static block_t block_m = {.block_shape_array = block_m_shape_array, .array_size = 4};
-static block_t block_l = {.block_shape_array = block_l_shape_array, .array_size = 4};
+static const uint8_t block_s_shape_array[] = {1, 3, 1};
+static const uint8_t block_m_shape_array[] = {2, 4, 4, 2};
+static const uint8_t block_l_shape_array[] = {3, 5, 5, 3};
 #elif defined MATRIX_32X32
-static uint8_t block_s_shape_array[] = {2, 4, 4, 2};
-static uint8_t block_m_shape_array[] = {3, 5, 5, 3};
-static uint8_t block_l_shape_array[] = {4, 6, 6, 4};
-static block_t block_s = {.block_shape_array = block_s_shape_array, .array_size = 4};
-static block_t block_m = {.block_shape_array = block_m_shape_array, .array_size = 4};
-static block_t block_l = {.block_shape_array = block_l_shape_array, .array_size = 4};
+static const uint8_t block_s_shape_array[] = {2, 4, 4, 2};
+static const uint8_t block_m_shape_array[] = {3, 5, 5, 3};
+static const uint8_t block_l_shape_array[] = {4, 6, 6, 4};
 #else
 #error "Unknown BLOCK_TYPE"
 #endif
+
+static const block_t block_s = {.block_shape_array = block_s_shape_array, .array_size = ARRAY_LENGTH(block_s_shape_array)};
+static const block_t block_m = {.block_shape_array = block_m_shape_array, .array_size = ARRAY_LENGTH(block_m_shape_array)};
+static const block_t block_l = {.block_shape_array = block_l_shape_array, .array_size = ARRAY_LENGTH(block_l_shape_array)};
 
 static asteroid_t **asteroid_objects = NULL;
 static list_t asteroid_indices_list = {0};
@@ -90,7 +85,7 @@ static return_val_t insertAtEnd_circular(list_t *p_list, uint32_t *array, uint8_
     node_t *new_node = malloc(sizeof(node_t));
     if (NULL == new_node)
     {
-        printf("\nMemory allocation failed while creating:\nnew_node\n");
+        ESP_LOGE(TAG, "\nMemory allocation failed while creating:\nnew_node\n");
         return MEM_ALLOC_ERROR;
     }
 
@@ -119,7 +114,7 @@ static void traversList_once(list_t *p_list, nodeCallback nodeCallback)
 {
     if (p_list->p_head == NULL)
     {
-        printf("List is empty");
+        ESP_LOGW(TAG, "List is empty");
         return;
     }
     uint8_t counter = 0;
@@ -152,7 +147,7 @@ static void printNodeValue(node_t *node, uint8_t node_position)
 {
     for (int i = 0; i < node->array_length; i += 1)
     {
-        printf("node value [%d] = %ld   node position = %d\n", i, node->array[i], node_position);
+        ESP_LOGI(TAG, "node value [%d] = %ld   node position = %d\n", i, node->array[i], node_position);
     }
 }
 
@@ -191,6 +186,7 @@ led_matrix_data_t *updateAsteroidField()
         if (NULL == (asteroid_objects = malloc(sizeof(asteroid_t *))))
         {
             ESP_LOGE(TAG, "Memory allocation failed while creating:\nasteroid_objects\n");
+            return MEM_ALLOC_ERROR;
         }
     }
     bool new_asteroid_created = false;
@@ -206,6 +202,7 @@ led_matrix_data_t *updateAsteroidField()
             NULL == (new_asteroid = malloc(sizeof(asteroid_t))))
         {
             ESP_LOGE(TAG, "Memory allocation failed while creating:\nasteroid_objects\nnew_asteroid\n");
+            return MEM_ALLOC_ERROR;
         }
         new_asteroid_created = true;
         new_asteroid->call_counter = 0;
@@ -308,7 +305,7 @@ led_matrix_data_t *updateAsteroidField()
         }
     }
 
-    /// Function to set proper asteroid pixel values with randomly generated start_index
+    /// Function to generate the pixels according to the asteroid shape beginning at the start index
     uint8_t values_added_counter = 0;
     for (uint8_t i = 0; i < objects_created_counter; i += 1)
     {
