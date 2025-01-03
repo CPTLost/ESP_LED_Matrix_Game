@@ -126,25 +126,30 @@ shot_data_t *createShot(player_data_t *player_data, shot_t *shot_type)
 /// @return SUCCESS
 return_val_t updatedShotDataArray(shot_data_t *new_shot, shot_data_t ***shot_data_array, uint8_t shot_data_array_size)
 {
+
+    // need to be thought through again........
     uint8_t expired_shots = 0;
     if (NULL != *shot_data_array)
     {
-        /// clearing shot_data_buffer_array of expired shots
+        /// clearing shot_data_array of expired shots
         for (uint8_t i = 0; i < shot_data_array_size; i += 1)
         {
             bool all_shot_indices_hit = true;
-            for (uint8_t j = 0; j < (*shot_data_array)[i]->array_size; j += 1)
+            if (NULL != (*shot_data_array)[i])
             {
-                if (false == (*shot_data_array)[i]->shot_hit_smth_array[j])
+                for (uint8_t j = 0; j < (*shot_data_array)[i]->array_size; j += 1)
                 {
-                    all_shot_indices_hit = false;
+                    if (false == (*shot_data_array)[i]->shot_hit_smth_array[j])
+                    {
+                        all_shot_indices_hit = false;
+                    }
                 }
-            }
-            if (true == all_shot_indices_hit)
-            {
-                free((*shot_data_array)[i]);
-                (*shot_data_array)[i] = NULL;
-                expired_shots += 1;
+                if (true == all_shot_indices_hit)
+                {
+                    free((*shot_data_array)[i]);
+                    (*shot_data_array)[i] = NULL;
+                    expired_shots += 1;
+                }
             }
         }
     }

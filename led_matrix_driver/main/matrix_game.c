@@ -45,6 +45,8 @@ static TaskHandle_t createShot_TaskHandler = NULL;
 static TaskHandle_t updateShotDataArray_TaskHandler = NULL;
 static TaskHandle_t updatePlayer_TaskHandler = NULL;
 
+static TaskHandle_t test_create_shot_TaskHandler = NULL;
+
 /// global variables
 static led_matrix_data_t *g_matrix_data_buffer = NULL;
 static led_matrix_data_t *g_asteroid_data_buffer = NULL;
@@ -61,6 +63,15 @@ void createShot_Task(void *param);
 void updateShotDataArray_Task(void *param);
 // still needs to be implemented
 void updatePlayer_Task(void *param);
+
+void test_create_shot_Task(void *param)
+{
+    while (!DOOMSDAY)
+    {
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        xTaskNotify(createShot_TaskHandler, 0x0, eNoAction);
+    }
+}
 
 void app_main(void)
 {
@@ -93,6 +104,8 @@ void app_main(void)
     xTaskCreate(createShot_Task, "createShot_Task", STD_TASK_STACKSIZE, NULL, STD_TASK_PRIORITY, &createShot_TaskHandler);
     xTaskCreate(updateShotDataArray_Task, "updateShotDataArray_Task", STD_TASK_STACKSIZE, NULL, STD_TASK_PRIORITY, &updateShotDataArray_TaskHandler);
     xTaskCreate(updatePlayer_Task, "updatePlayer_Task", STD_TASK_STACKSIZE, NULL, STD_TASK_PRIORITY, &updatePlayer_TaskHandler);
+
+    xTaskCreate(test_create_shot_Task, "test_create_shot_Task", STD_TASK_STACKSIZE, NULL, STD_TASK_PRIORITY, &test_create_shot_TaskHandler);
 }
 
 void updateGame_Task(void *param)

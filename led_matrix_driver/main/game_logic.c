@@ -9,10 +9,12 @@
 
 #include "return_val.h"
 
+#define HIT_POINTS 3
 #define NUMBER_OF_POSSIBLE_COLLISION_POINTS 4 // This is determined by the player model and size
 
 static const char *TAG = "GAME_LOGIC";
 static bool g_game_lost = false;
+static uint8_t g_player_hit_counter = 0;
 
 static uint16_t *shot_asteroids_indices = NULL;
 static uint16_t amount_of_shot_asteroids_indices = 0;
@@ -222,10 +224,11 @@ led_matrix_data_t *updateGame(led_matrix_data_t *asteroid_data, bool new_asteroi
                               player_data_t *player_data, shot_data_t **shot_data_array, uint8_t shot_data_array_size)
 {
     /// checks for valid inputs
-    if (true == g_game_lost)
+    if (HIT_POINTS <= g_player_hit_counter)
     {
         ESP_LOGI(TAG, "GAME OVER\n");
-        g_game_lost = false;
+        g_game_lost = true;
+        g_player_hit_counter = 0;
         // Show GAME OVER and survived time etc.
     }
     if (NULL == asteroid_data)
@@ -288,7 +291,7 @@ led_matrix_data_t *updateGame(led_matrix_data_t *asteroid_data, bool new_asteroi
     {
         if (true == set_asteroid_indices[player_data->player_index_array[i]])
         {
-            g_game_lost = true;
+            g_player_hit_counter += 1;
             collision_index_array[collision_counter] = player_data->player_index_array[i];
             collision_counter += 1;
         }
