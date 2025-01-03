@@ -50,9 +50,9 @@ static TaskHandle_t test_create_shot_TaskHandler = NULL;
 /// global variables
 static led_matrix_data_t *g_matrix_data_buffer = NULL;
 static led_matrix_data_t *g_asteroid_data_buffer = NULL;
-static shot_data_t **g_shot_data_array = NULL;
+static shot_data_t **g_shot_data_array = NULL; // pointer array
 static player_data_t *g_player_data_buffer = NULL;
-static uint32_t g_asteroid_delay_ms = 300;
+static uint32_t g_asteroid_delay_ms = 500;
 static uint8_t g_shot_data_array_size = 0;
 
 /// task declarations
@@ -106,6 +106,14 @@ void app_main(void)
     xTaskCreate(updatePlayer_Task, "updatePlayer_Task", STD_TASK_STACKSIZE, NULL, STD_TASK_PRIORITY, &updatePlayer_TaskHandler);
 
     xTaskCreate(test_create_shot_Task, "test_create_shot_Task", STD_TASK_STACKSIZE, NULL, STD_TASK_PRIORITY, &test_create_shot_TaskHandler);
+
+    // // test
+    // vTaskDelay(2000 / portTICK_PERIOD_MS);
+    // while (1)
+    // {
+    //     xTaskNotify(updateGame_TaskHandler, 0, eSetValueWithOverwrite);
+    //     vTaskDelay(100 / portTICK_PERIOD_MS);
+    // }
 }
 
 void updateGame_Task(void *param)
@@ -139,7 +147,8 @@ void updateGame_Task(void *param)
         xSemaphoreTake(gMutex_matrix_data_buffer, portMAX_DELAY);
         if (NULL != g_matrix_data_buffer)
         {
-            free(g_matrix_data_buffer);
+            free(g_matrix_data_buffer->ptr_index_array_leds_to_set);
+            free(g_matrix_data_buffer->ptr_rgb_array_leds_to_set);
         }
         g_matrix_data_buffer = new_matrix_data;
         xSemaphoreGive(gMutex_matrix_data_buffer);
@@ -177,6 +186,8 @@ void updateAsteroidField_Task(void *param)
         xSemaphoreTake(gMutex_asteroid_data_buffer, portMAX_DELAY);
         if (NULL != g_asteroid_data_buffer)
         {
+            free(g_asteroid_data_buffer->ptr_index_array_leds_to_set);
+            free(g_asteroid_data_buffer->ptr_rgb_array_leds_to_set);
             free(g_asteroid_data_buffer);
         }
         g_asteroid_data_buffer = new_asteroid_data;
@@ -202,7 +213,7 @@ void createShot_Task(void *param)
         xSemaphoreTake(gMutex_shot_data_array_size, portMAX_DELAY);
         xSemaphoreTake(gMutex_shot_data_array, portMAX_DELAY);
 
-        updatedShotDataArray(new_shot, &g_shot_data_array, g_shot_data_array_size);
+        updatedShotDataArray(new_shot, &g_shot_data_array, &g_shot_data_array_size);
 
         xSemaphoreGive(gMutex_shot_data_array_size);
         xSemaphoreGive(gMutex_shot_data_array);
@@ -220,7 +231,7 @@ void updateShotDataArray_Task(void *param)
         xSemaphoreTake(gMutex_shot_data_array_size, portMAX_DELAY);
         xSemaphoreTake(gMutex_shot_data_array, portMAX_DELAY);
 
-        updatedShotDataArray(NULL, &g_shot_data_array, g_shot_data_array_size);
+        updatedShotDataArray(NULL, &g_shot_data_array, &g_shot_data_array_size);
 
         xSemaphoreGive(gMutex_shot_data_array_size);
         xSemaphoreGive(gMutex_shot_data_array);

@@ -122,20 +122,29 @@ shot_data_t *createShot(player_data_t *player_data, shot_t *shot_type)
 /// @brief updates shot_data_array: deletes expired shots and creates new array containing the given new_shot and all old valid shots.
 /// @param new_shot ptr to new shot
 /// @param shot_data_array ptr to shot data array
-/// @param shot_data_array_size
+/// @param ptr_shot_data_array_size ptr to shot_data_array_size
 /// @return SUCCESS
-return_val_t updatedShotDataArray(shot_data_t *new_shot, shot_data_t ***shot_data_array, uint8_t shot_data_array_size)
+return_val_t updatedShotDataArray(shot_data_t *new_shot, shot_data_t ***shot_data_array, uint8_t *ptr_shot_data_array_size)
 {
+    // situations: new shot available or not, Shot data array is empty or not -> 4 different cases
+    // 1. if new shot and shot data array is empty -> just return
+    // 2. if new shot is empty and data array is not -> check for expired shots and delete them
+    // 3. if new shot is not empty and data array is empty -> create new shot data array with new shot
+    // 4. if new shot and data array is not empty -> check for expired shots and delete them, then add new shot to the array
 
-    // need to be thought through again........
+    if ((NULL == new_shot) && (NULL == *shot_data_array))
+    {
+        return SUCCESS;
+    }
+
     uint8_t expired_shots = 0;
     if (NULL != *shot_data_array)
     {
         /// clearing shot_data_array of expired shots
-        for (uint8_t i = 0; i < shot_data_array_size; i += 1)
+        for (uint8_t i = 0; i < *ptr_shot_data_array_size; i += 1)
         {
             bool all_shot_indices_hit = true;
-            if (NULL != (*shot_data_array)[i])
+            if (NULL != (*shot_data_array)[i]) // gets pointer i in the pointer array
             {
                 for (uint8_t j = 0; j < (*shot_data_array)[i]->array_size; j += 1)
                 {
@@ -146,6 +155,8 @@ return_val_t updatedShotDataArray(shot_data_t *new_shot, shot_data_t ***shot_dat
                 }
                 if (true == all_shot_indices_hit)
                 {
+                    free((*shot_data_array)[i]->shot_hit_smth_array);
+                    free((*shot_data_array)[i]->shot_index_array);
                     free((*shot_data_array)[i]);
                     (*shot_data_array)[i] = NULL;
                     expired_shots += 1;
@@ -154,45 +165,46 @@ return_val_t updatedShotDataArray(shot_data_t *new_shot, shot_data_t ***shot_dat
         }
     }
 
+    uint8_t new_shot_data_array_size = *ptr_shot_data_array_size - expired_shots;
+
     if (NULL != new_shot)
     {
-        shot_data_array_size += 1;
-    }
-    shot_data_t **new_shot_data_array = NULL;
-    if (0 < shot_data_array_size)
-    {
-        if (NULL == (new_shot_data_array = malloc(sizeof(**shot_data_array) * (shot_data_array_size - expired_shots))))
-        {
-            ESP_LOGE(TAG, "Memory alloaction failed while creating:\nnew_shot_data_array\n");
-        }
+        new_shot_data_array_size += 1;
     }
 
-    if (NULL != *shot_data_array)
+    /// if new_shot_data_array_size == *ptr_shot_data_array_size there is no need to create new array coz no shot expired and no new shot needs to be added
+    if (new_shot_data_array_size != *ptr_shot_data_array_size)
     {
-        /// copying all non NULL values from the old to the new_shot_data_array
-        uint8_t shots_copied_counter = 0;
-        for (uint8_t i = 0; i < shot_data_array_size; i += 1)
+        shot_data_t **new_shot_data_array = NULL;
+        if (new_shot_data_array_size > 0)
         {
-            if (NULL != (*shot_data_array)[i])
+            if (NULL == (new_shot_data_array = malloc(sizeof(**shot_data_array) * new_shot_data_array_size)))
             {
-                new_shot_data_array[shots_copied_counter] = (*shot_data_array)[i];
-                shots_copied_counter += 1;
+                ESP_LOGE(TAG, "Memory alloaction failed while creating:\nnew_shot_data_array\n");
             }
         }
-    }
 
-    if (NULL != new_shot)
-    {
-        new_shot_data_array[shot_data_array_size - expired_shots - 1] = new_shot;
-    }
-    if (NULL != *shot_data_array)
-    {
-        free(*shot_data_array);
-    }
-    if (0 < shot_data_array_size)
-    {
+        /// if shot_data_array is not empty, copy all non NULL values from the shot_data_array to the new_shot_data_array
+        if ((NULL != *shot_data_array) && (NULL != new_shot_data_array))
+        {
+            uint8_t shots_copied_counter = 0;
+            for (uint8_t i = 0; i < *ptr_shot_data_array_size; i += 1)
+            {
+                if (NULL != (*shot_data_array)[i])
+                {
+                    new_shot_data_array[shots_copied_counter] = (*shot_data_array)[i];
+                    shots_copied_counter += 1;
+                }
+            }
+        }
+
+        if ((NULL != new_shot) && (NULL != new_shot_data_array))
+        {
+            new_shot_data_array[new_shot_data_array_size - 1] = new_shot;
+        }
+
         *shot_data_array = new_shot_data_array;
-        shot_data_array_size -= expired_shots;
+        *ptr_shot_data_array_size = new_shot_data_array_size;
     }
 
     return SUCCESS;

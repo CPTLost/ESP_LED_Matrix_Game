@@ -28,6 +28,6 @@ extern const shot_t normal_shot_type;
 extern const shot_t double_shot_type;
 
 shot_data_t *createShot(player_data_t *player_data, shot_t *shot_type);
-return_val_t updatedShotDataArray(shot_data_t *new_shot, shot_data_t ***shot_data_array, uint8_t shot_data_array_size);
+return_val_t updatedShotDataArray(shot_data_t *new_shot, shot_data_t ***shot_data_array, uint8_t *ptr_shot_data_array_size);
 
 #endif
