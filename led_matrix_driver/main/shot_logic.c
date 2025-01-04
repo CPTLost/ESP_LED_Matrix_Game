@@ -5,11 +5,12 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <driver/gpio.h>
 
 #include "return_val.h"
 
 static const uint8_t normal_shot_shape_array[] = {1};
-static const uint8_t std_shot_rgb_values[] = {0, 50, 0};
+static const uint8_t std_shot_rgb_values[] = {0, 25, 0};
 const shot_t normal_shot_type = {.shot_shape_array = normal_shot_shape_array,
                                  .shot_rgb_values = std_shot_rgb_values,
                                  .array_size = ARRAY_LENGTH(normal_shot_shape_array)};
@@ -20,6 +21,38 @@ const shot_t double_shot_type = {.shot_shape_array = double_shot_shape_array,
                                  .array_size = ARRAY_LENGTH(double_shot_shape_array)};
 
 static const char *TAG = "SHOT_LOGIC";
+
+static bool isr_installed = false;
+
+void trigger_shot(void);
+void trigger_isr_handler()
+{
+    trigger_shot();
+}
+
+return_val_t init_button_for_shot_trigger(uint8_t GPIO_BUTTON_PIN)
+{
+    gpio_config_t io_conf = {
+        .pin_bit_mask = 1 << GPIO_BUTTON_PIN,
+        .intr_type = GPIO_INTR_NEGEDGE,
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+    };
+    gpio_config(&io_conf);
+
+    if (isr_installed == false)
+    {
+        gpio_install_isr_service(0);
+        isr_installed = true;
+    }
+
+    gpio_isr_handler_add(GPIO_BUTTON_PIN, trigger_isr_handler, NULL);
+
+    return SUCCESS;
+}
+
+__attribute__((weak)) void trigger_shot(void) {}
 
 shot_data_t *createShot(player_data_t *player_data, shot_t *shot_type)
 {
