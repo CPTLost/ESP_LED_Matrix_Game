@@ -25,7 +25,8 @@
 #define FRAME_UPDATE_TIME_MS 10
 #define SHOT_COOLDOWN_IN_MS 200
 
-#define SHOT_BTN_GPIO 2
+#define SHOT_BTN_1_GPIO 2 // right button
+#define SHOT_BTN_2_GPIO 9 // left button
 
 #define STD_TASK_STACKSIZE 4096
 #define STD_TASK_PRIORITY 3
@@ -76,15 +77,6 @@ void trigger_shot(void)
     xTaskNotifyFromISR(createShot_TaskHandler, 0, eNoAction, 0);
 }
 
-void test_create_shot_Task(void *param)
-{
-    while (!DOOMSDAY)
-    {
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        xTaskNotify(createShot_TaskHandler, 0x0, eNoAction);
-    }
-}
-
 void app_main(void)
 {
 
@@ -102,7 +94,10 @@ void app_main(void)
     // config interrupts etc
 
     initLedMatrix();
-    init_button_for_shot_trigger(SHOT_BTN_GPIO);
+    // init_button_for_shot_trigger(SHOT_BTN_GPIO);
+
+    init_buttons_for_shot_trigger(SHOT_BTN_1_GPIO, SHOT_BTN_2_GPIO);
+
     g_player_data_buffer = initPlayer(&normal_player);
 
     gMutex_matrix_data_buffer = xSemaphoreCreateMutex();
@@ -118,8 +113,6 @@ void app_main(void)
     xTaskCreate(createShot_Task, "createShot_Task", STD_TASK_STACKSIZE, NULL, STD_TASK_PRIORITY, &createShot_TaskHandler);
     xTaskCreate(updateShotDataArray_Task, "updateShotDataArray_Task", STD_TASK_STACKSIZE, NULL, STD_TASK_PRIORITY, &updateShotDataArray_TaskHandler);
     xTaskCreate(updatePlayer_Task, "updatePlayer_Task", STD_TASK_STACKSIZE, NULL, STD_TASK_PRIORITY, &updatePlayer_TaskHandler);
-
-    xTaskCreate(test_create_shot_Task, "test_create_shot_Task", STD_TASK_STACKSIZE, NULL, STD_TASK_PRIORITY, &test_create_shot_TaskHandler);
 }
 
 void updateGame_Task(void *param)
@@ -256,10 +249,12 @@ void updatePlayer_Task(void *param)
 {
     while (!DOOMSDAY)
     {
-        // take semaphores
-        // Updated player position
-        // give semaphores
-        // notify updateGame
+        xSemaphoreTake(gMutex_player_data_buffer, portMAX_DELAY);
+
+        updatePlayerPosition(g_player_data_buffer, (gpio_get_level(SHOT_BTN_2_GPIO) == 0), (gpio_get_level(SHOT_BTN_1_GPIO) == 0));
+
+        xSemaphoreGive(gMutex_player_data_buffer);
+
         vTaskDelay(PLAYER_UPDATE_SPEED_MS / portTICK_PERIOD_MS);
     }
 }

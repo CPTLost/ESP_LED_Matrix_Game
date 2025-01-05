@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <esp_log.h>
+#include <stdbool.h>
 
 #include "led_matrix_driver.h"
 
@@ -22,7 +23,7 @@ static void fillPlayerData(player_data_t *player_data)
         return;
     }
     uint16_t start_position = MATRIX_SIDE_LENGTH / 2;
-    player_data->shot_start_position = start_position + MATRIX_SIDE_LENGTH * player_data->player_type->array_size;
+    player_data->shot_start_position = start_position + MATRIX_SIDE_LENGTH * (player_data->player_type->array_size - 1);
 
     uint8_t values_added_counter = 0;
 
@@ -84,4 +85,52 @@ player_data_t *initPlayer(player_t *player_type)
     fillPlayerData(player_data);
 
     return player_data;
+}
+
+void updatePlayerPosition(player_data_t *player_data, bool move_left, bool move_right)
+{
+    if (true == (move_left && move_right))
+    {
+        return;
+    }
+
+    if (true == move_left)
+    {
+        bool limit_reached = false;
+        for (size_t i = 0; i < player_data->array_size; i += 1)
+        {
+            if ((player_data->player_index_array[i] % MATRIX_SIDE_LENGTH) - 1 < 0)
+            {
+                limit_reached = true;
+            }
+        }
+        if (false == limit_reached)
+        {
+            for (size_t i = 0; i < player_data->array_size; i += 1)
+            {
+                player_data->player_index_array[i] -= 1;
+            }
+            player_data->shot_start_position -= 1;
+        }
+    }
+
+    if (true == move_right)
+    {
+        bool limit_reached = false;
+        for (size_t i = 0; i < player_data->array_size; i += 1)
+        {
+            if ((player_data->player_index_array[i] % MATRIX_SIDE_LENGTH) + 1 >= MATRIX_SIDE_LENGTH)
+            {
+                limit_reached = true;
+            }
+        }
+        if (false == limit_reached)
+        {
+            for (size_t i = 0; i < player_data->array_size; i += 1)
+            {
+                player_data->player_index_array[i] += 1;
+            }
+            player_data->shot_start_position += 1;
+        }
+    }
 }

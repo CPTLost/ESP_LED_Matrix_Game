@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <driver/gpio.h>
+#include <esp_attr.h>
 
 #include "return_val.h"
 
@@ -24,22 +25,37 @@ static const char *TAG = "SHOT_LOGIC";
 
 static bool isr_installed = false;
 
+static int8_t gpio_button_pin_1 = -1;
+static int8_t gpio_button_pin_2 = -1;
+
 void trigger_shot(void);
-void trigger_isr_handler()
+void IRAM_ATTR trigger_isr_handler(void *arg)
 {
-    trigger_shot();
+    if ((gpio_get_level(gpio_button_pin_1) == 0) && (gpio_get_level(gpio_button_pin_2) == 0))
+    {
+        trigger_shot();
+    }
 }
 
-return_val_t init_button_for_shot_trigger(uint8_t GPIO_BUTTON_PIN)
+return_val_t init_buttons_for_shot_trigger(uint8_t GPIO_BUTTON_PIN_1, uint8_t GPIO_BUTTON_PIN_2)
 {
-    gpio_config_t io_conf = {
-        .pin_bit_mask = 1 << GPIO_BUTTON_PIN,
+    gpio_config_t io_conf_1 = {
+        .pin_bit_mask = 1 << GPIO_BUTTON_PIN_1,
         .intr_type = GPIO_INTR_NEGEDGE,
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
     };
-    gpio_config(&io_conf);
+    gpio_config(&io_conf_1);
+
+    gpio_config_t io_conf_2 = {
+        .pin_bit_mask = 1 << GPIO_BUTTON_PIN_2,
+        .intr_type = GPIO_INTR_NEGEDGE,
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+    };
+    gpio_config(&io_conf_2);
 
     if (isr_installed == false)
     {
@@ -47,7 +63,11 @@ return_val_t init_button_for_shot_trigger(uint8_t GPIO_BUTTON_PIN)
         isr_installed = true;
     }
 
-    gpio_isr_handler_add(GPIO_BUTTON_PIN, trigger_isr_handler, NULL);
+    gpio_button_pin_1 = GPIO_BUTTON_PIN_1;
+    gpio_button_pin_2 = GPIO_BUTTON_PIN_2;
+
+    gpio_isr_handler_add(GPIO_BUTTON_PIN_1, trigger_isr_handler, NULL);
+    gpio_isr_handler_add(GPIO_BUTTON_PIN_2, trigger_isr_handler, NULL);
 
     return SUCCESS;
 }

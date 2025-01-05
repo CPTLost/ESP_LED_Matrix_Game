@@ -2,6 +2,7 @@
 #define PLAYER_LOGIC
 
 #include <inttypes.h>
+#include <stdbool.h>
 
 #define ARRAY_LENGTH(x) sizeof(x) / sizeof(x[0])
 
@@ -23,5 +24,6 @@ typedef struct
 extern const player_t normal_player;
 
 player_data_t *initPlayer(player_t *player_type);
+void updatePlayerPosition(player_data_t *player_data, bool move_left, bool move_right);
 
 #endif
