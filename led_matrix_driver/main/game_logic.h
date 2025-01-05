@@ -7,6 +7,6 @@
 #include "shot_logic.h"
 
 led_matrix_data_t *updateGame(led_matrix_data_t *asteroid_data, bool new_asteroid_data,
-                              player_data_t *player_data, shot_data_t **shot_data_array, uint8_t shot_data_array_size);
+                              player_data_t *player_data, shot_data_t **shot_data_array, uint8_t shot_data_array_size, bool *game_lost);
 
-#endif // GAME_LOGIC
+#endif

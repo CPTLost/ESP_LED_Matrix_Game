@@ -7,13 +7,16 @@
 #include <assert.h>
 #include <limits.h>
 
-#include "return_val.h"
+#include "graphics.h"
 
-#define HIT_POINTS 3
+#include "return_val.h"
+#include "player_logic.h"
+
+#define HIT_POINTS 1
 #define NUMBER_OF_POSSIBLE_COLLISION_POINTS 4 // This is determined by the player model and size
 
 static const char *TAG = "GAME_LOGIC";
-static bool g_game_lost = false;
+// static bool g_game_lost = false;
 static uint8_t g_player_hit_counter = 0;
 
 static uint16_t *shot_asteroids_indices = NULL;
@@ -22,7 +25,7 @@ static uint16_t amount_of_shot_asteroids_indices = 0;
 static return_val_t fillReturnArrays(uint16_t combined_array_length, led_matrix_data_t *asteroid_data, uint16_t *ptr_index_array,
                                      uint8_t (*ptr_rgb_array)[3], shot_data_t **shot_data_array, uint8_t shot_data_array_size,
                                      uint16_t shot_data_indices_array_size, player_data_t *player_data, uint8_t collision_rgb_value[],
-                                     uint8_t collision_counter, uint16_t collision_index_array[])
+                                     uint8_t collision_counter, uint16_t collision_index_array[], bool game_lost)
 {
     uint8_t shot_array_counter = 0;
     uint8_t shot_index_counter = 0;
@@ -49,10 +52,18 @@ static return_val_t fillReturnArrays(uint16_t combined_array_length, led_matrix_
         /// inserting player data
         else if (i < asteroid_data->array_length + amount_of_shot_asteroids_indices + player_data->array_size)
         {
+            uint8_t rgb_values_game_lost[3] = {25, 0, 0};
             ptr_index_array[i] = player_data->player_index_array[i - (asteroid_data->array_length + amount_of_shot_asteroids_indices)];
             for (uint8_t j = 0; j < 3; j += 1)
             {
-                ptr_rgb_array[i][j] = player_data->player_type->player_rgb_values[j];
+                if (true == game_lost)
+                {
+                    ptr_rgb_array[i][j] = rgb_values_game_lost[j];
+                }
+                else
+                {
+                    ptr_rgb_array[i][j] = player_data->player_type->player_rgb_values[j];
+                }
             }
         }
         /// inserting shot data
@@ -181,7 +192,7 @@ static return_val_t checkShotAsteroidCollision(bool set_asteroid_indices[], led_
                 {
                     new_shot_asteroids_indices[counter] = shot_data_array[i]->shot_index_array[j];
                     shot_data_array[i]->shot_hit_smth_array[j] = true;
-                    ESP_LOGW(TAG, "\n Hit smth !\n");
+                    // ESP_LOGW(TAG, "\n Hit smth !\n");
                     counter += 1;
                     set_asteroid_indices[shot_data_array[i]->shot_index_array[j]] = false;
                     amount_of_shot_asteroids_indices += 1;
@@ -221,15 +232,24 @@ static return_val_t checkShotAsteroidCollision(bool set_asteroid_indices[], led_
 }
 
 led_matrix_data_t *updateGame(led_matrix_data_t *asteroid_data, bool new_asteroid_data,
-                              player_data_t *player_data, shot_data_t **shot_data_array, uint8_t shot_data_array_size)
+                              player_data_t *player_data, shot_data_t **shot_data_array, uint8_t shot_data_array_size, bool *game_lost)
 {
     /// checks for valid inputs
     if (HIT_POINTS <= g_player_hit_counter)
     {
-        ESP_LOGI(TAG, "GAME OVER\n");
-        g_game_lost = true;
+        // ESP_LOGI(TAG, "GAME OVER\n");
+        *game_lost = true;
         g_player_hit_counter = 0;
-        // Show GAME OVER and survived time etc.
+
+        /// change the color of the player to indicate that he/she has lost
+        // player_data->player_type->player_rgb_values[0] = 25;
+        // player_data->player_type->player_rgb_values[1] = 0;
+        // player_data->player_type->player_rgb_values[2] = 0;
+    }
+    else
+    {
+        /// Standard color
+        // player_data->player_type->player_rgb_values = normal_player.player_rgb_values;
     }
     if (NULL == asteroid_data)
     {
@@ -246,7 +266,6 @@ led_matrix_data_t *updateGame(led_matrix_data_t *asteroid_data, bool new_asteroi
     {
         shot_asteroids_indices = malloc(sizeof(*shot_asteroids_indices) * asteroid_data->array_length);
     }
-
 
     updateShotAsteroidIndices(new_asteroid_data, asteroid_data);
 
@@ -338,11 +357,11 @@ led_matrix_data_t *updateGame(led_matrix_data_t *asteroid_data, bool new_asteroi
         return MEM_ALLOC_ERROR;
     }
 
-    uint8_t collision_rgb_value[3] = {20, 5, 20};
+    uint8_t collision_rgb_value[3] = {30, 5, 20};
 
     fillReturnArrays(combined_array_length, asteroid_data, ptr_index_array, ptr_rgb_array, shot_data_array,
                      shot_data_array_size, shot_data_indices_array_size, player_data, collision_rgb_value,
-                     collision_counter, collision_index_array);
+                     collision_counter, collision_index_array, *game_lost);
 
     matrix_data->ptr_index_array_leds_to_set = ptr_index_array;
     matrix_data->ptr_rgb_array_leds_to_set = ptr_rgb_array;

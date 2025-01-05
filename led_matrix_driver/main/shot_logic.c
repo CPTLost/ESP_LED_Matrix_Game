@@ -28,12 +28,12 @@ static bool isr_installed = false;
 static int8_t gpio_button_pin_1 = -1;
 static int8_t gpio_button_pin_2 = -1;
 
-void trigger_shot(void);
+void isrCallbackFunction(void);
 void IRAM_ATTR trigger_isr_handler(void *arg)
 {
     if ((gpio_get_level(gpio_button_pin_1) == 0) && (gpio_get_level(gpio_button_pin_2) == 0))
     {
-        trigger_shot();
+        isrCallbackFunction();
     }
 }
 
@@ -72,7 +72,7 @@ return_val_t init_buttons_for_shot_trigger(uint8_t GPIO_BUTTON_PIN_1, uint8_t GP
     return SUCCESS;
 }
 
-__attribute__((weak)) void trigger_shot(void) {}
+__attribute__((weak)) void isrCallbackFunction(void) {}
 
 shot_data_t *createShot(player_data_t *player_data, shot_t *shot_type)
 {

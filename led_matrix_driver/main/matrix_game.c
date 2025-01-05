@@ -9,8 +9,10 @@
 #include <freertos/task.h>
 #include <esp_random.h>
 #include <driver/gpio.h>
+#include "driver/gptimer.h"
 
 #include "led_strip.h"
+#include "graphics.h"
 
 #include "return_val.h"
 #include "led_matrix_driver.h"
@@ -18,6 +20,7 @@
 #include "game_logic.h"
 #include "player_logic.h"
 #include "shot_logic.h"
+#include "i2c4display.h"
 
 #define DOOMSDAY 0
 
@@ -50,8 +53,7 @@ static TaskHandle_t updateLedMatrix_TaskHandler = NULL;
 static TaskHandle_t createShot_TaskHandler = NULL;
 static TaskHandle_t updateShotDataArray_TaskHandler = NULL;
 static TaskHandle_t updatePlayer_TaskHandler = NULL;
-
-static TaskHandle_t test_create_shot_TaskHandler = NULL;
+static TaskHandle_t gameDisplay_TaskHandler = NULL;
 
 /// global variables
 static led_matrix_data_t *g_matrix_data_buffer = NULL;
@@ -60,43 +62,28 @@ static uint32_t g_asteroid_delay_ms = 300;
 static shot_data_t **g_shot_data_array = NULL; // pointer array
 static uint8_t g_shot_data_array_size = 0;
 static player_data_t *g_player_data_buffer = NULL;
+// static uint64_t survival_time = 0;
+static bool game_started = false;
+static bool game_lost = false;
+static bool stop_asteriods = true;
 
-// static bool new_asteroid_data_flag = false;
-
-/// task declarations
+/// task/function declarations
 void updateGame_Task(void *param);
 void updateLedMatrix_Task(void *param);
 void updateAsteroidField_Task(void *param);
 void createShot_Task(void *param);
 void updateShotDataArray_Task(void *param);
-// still needs to be implemented
 void updatePlayer_Task(void *param);
+void gameDisplay_Task(void *param);
 
-void trigger_shot(void)
-{
-    xTaskNotifyFromISR(createShot_TaskHandler, 0, eNoAction, 0);
-}
+void isrCallbackFunction(void);
 
 void app_main(void)
 {
-
-    ////////////// temp test code :
-    // static uint16_t player_index_array[] = {7, 8, 9, 8 + MATRIX_SIDE_LENGTH};
-    // static uint16_t player_shot_start_pos = 8;
-    // static player_data_t normal_player_data = {.player_type = &normal_player,
-    //                                            .shot_start_position = 8,
-    //                                            .player_index_array = player_index_array,
-    //                                            .array_size = ARRAY_LENGTH(player_index_array)};
-
-    // g_player_data_buffer = &normal_player_data;
-    /////////
-
-    // config interrupts etc
-
     initLedMatrix();
-    // init_button_for_shot_trigger(SHOT_BTN_GPIO);
-
     init_buttons_for_shot_trigger(SHOT_BTN_1_GPIO, SHOT_BTN_2_GPIO);
+    ESP_ERROR_CHECK(initI2C(I2C_INTERFACE));
+    ESP_ERROR_CHECK(graphics_init(I2C_INTERFACE, CONFIG_GRAPHICS_PIXELWIDTH, CONFIG_GRAPHICS_PIXELHEIGHT, 0, true, false));
 
     g_player_data_buffer = initPlayer(&normal_player);
 
@@ -113,6 +100,85 @@ void app_main(void)
     xTaskCreate(createShot_Task, "createShot_Task", STD_TASK_STACKSIZE, NULL, STD_TASK_PRIORITY, &createShot_TaskHandler);
     xTaskCreate(updateShotDataArray_Task, "updateShotDataArray_Task", STD_TASK_STACKSIZE, NULL, STD_TASK_PRIORITY, &updateShotDataArray_TaskHandler);
     xTaskCreate(updatePlayer_Task, "updatePlayer_Task", STD_TASK_STACKSIZE, NULL, STD_TASK_PRIORITY, &updatePlayer_TaskHandler);
+    xTaskCreate(gameDisplay_Task, "gameDisplay_Task", STD_TASK_STACKSIZE, NULL, STD_TASK_PRIORITY, &gameDisplay_TaskHandler);
+}
+
+void gameDisplay_Task(void *param)
+{
+    gptimer_handle_t gptimer = NULL;
+    gptimer_config_t timer_config = {
+        .clk_src = GPTIMER_CLK_SRC_DEFAULT,
+        .direction = GPTIMER_COUNT_UP,
+        .resolution_hz = 1 * 1000 * 1000, // 1MHz, 1 tick = 1us
+    };
+
+    ESP_ERROR_CHECK(gptimer_new_timer(&timer_config, &gptimer));
+    ESP_ERROR_CHECK(gptimer_enable(gptimer));
+
+    while (!DOOMSDAY)
+    {
+        // Starting Screen
+        graphics_startUpdate();
+        graphics_println("         ASTEROID");
+        graphics_println("       DESTROYER");
+        graphics_finishUpdate();
+
+        while (!game_started)
+        {
+            graphics_startUpdate();
+            graphics_setCursor(0, 40);
+            graphics_println("    Press Both Btns");
+            graphics_finishUpdate();
+            vTaskDelay(900 / portTICK_PERIOD_MS);
+            graphics_startUpdate();
+            graphics_clearRegion(0, 40, 128, 64);
+            graphics_finishUpdate();
+            vTaskDelay(300 / portTICK_PERIOD_MS);
+        }
+        stop_asteriods = false;
+        ESP_ERROR_CHECK(gptimer_start(gptimer));
+
+        char time[25];
+        while (!game_lost)
+        {
+            uint64_t survival_time_in_us = 0;
+            ESP_ERROR_CHECK(gptimer_get_raw_count(gptimer, &survival_time_in_us));
+            uint32_t minutes = (survival_time_in_us / 1000000) / 60;
+            uint32_t seconds = (survival_time_in_us / 1000000) % 60;
+            uint32_t milliseconds = (survival_time_in_us / 1000) % 60;
+            snprintf(time, sizeof(time), "Survived: %ld:%ld:%ld", minutes, seconds, milliseconds);
+
+            graphics_startUpdate();
+            graphics_clearRegion(0, 40, 128, 64);
+            graphics_setCursor(0, 40);
+            graphics_println(time);
+            graphics_finishUpdate();
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+        }
+        game_started = false;
+        ESP_ERROR_CHECK(gptimer_stop(gptimer));
+        ESP_ERROR_CHECK(gptimer_set_raw_count(gptimer, 0));
+        graphics_startUpdate();
+        graphics_clearRegion(0, 40, 128, 64);
+        graphics_setCursor(0, 40);
+        graphics_println(time);
+        graphics_finishUpdate();
+
+        while (game_lost)
+        {
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+        }
+
+        stop_asteriods = true;
+        xSemaphoreTake(gMutex_asteroid_data_buffer, portMAX_DELAY);
+        if (NULL != g_asteroid_data_buffer)
+        {
+            free(g_asteroid_data_buffer->ptr_index_array_leds_to_set);
+            free(g_asteroid_data_buffer->ptr_rgb_array_leds_to_set);
+            free(g_asteroid_data_buffer);
+        }
+        xSemaphoreGive(gMutex_asteroid_data_buffer);
+    }
 }
 
 void updateGame_Task(void *param)
@@ -122,7 +188,6 @@ void updateGame_Task(void *param)
         /// changing asteroid delay still missing and maybe also changing row_offset
         uint32_t notification_value = 0;
         xTaskNotifyWait(0x00, UINT32_MAX, &notification_value, 0);
-        // xTaskNotifyWait(0x00, UINT32_MAX, &notification_value, portMAX_DELAY);
         if (NULL != g_asteroid_data_buffer)
         {
 
@@ -139,7 +204,7 @@ void updateGame_Task(void *param)
 
             led_matrix_data_t *new_matrix_data = updateGame(
                 g_asteroid_data_buffer, new_asteroid_data_flag,
-                g_player_data_buffer, g_shot_data_array, g_shot_data_array_size);
+                g_player_data_buffer, g_shot_data_array, g_shot_data_array_size, &game_lost);
 
             xSemaphoreGive(gMutex_asteroid_data_buffer);
             xSemaphoreGive(gMutex_player_data_buffer);
@@ -159,7 +224,6 @@ void updateGame_Task(void *param)
             xTaskNotify(updateLedMatrix_TaskHandler, 0, eNoAction);
             xTaskNotify(updateShotDataArray_TaskHandler, 0, eNoAction);
         }
-
         vTaskDelay(FRAME_UPDATE_TIME_MS / portTICK_PERIOD_MS);
     }
 }
@@ -187,18 +251,21 @@ void updateAsteroidField_Task(void *param)
 
         vTaskDelay(delay / portTICK_PERIOD_MS);
 
-        led_matrix_data_t *new_asteroid_data = updateAsteroidField();
-
-        xSemaphoreTake(gMutex_asteroid_data_buffer, portMAX_DELAY);
-        if (NULL != g_asteroid_data_buffer)
+        if (!stop_asteriods)
         {
-            free(g_asteroid_data_buffer->ptr_index_array_leds_to_set);
-            free(g_asteroid_data_buffer->ptr_rgb_array_leds_to_set);
-            free(g_asteroid_data_buffer);
+            led_matrix_data_t *new_asteroid_data = updateAsteroidField();
+
+            xSemaphoreTake(gMutex_asteroid_data_buffer, portMAX_DELAY);
+            if (NULL != g_asteroid_data_buffer)
+            {
+                free(g_asteroid_data_buffer->ptr_index_array_leds_to_set);
+                free(g_asteroid_data_buffer->ptr_rgb_array_leds_to_set);
+                free(g_asteroid_data_buffer);
+            }
+            g_asteroid_data_buffer = new_asteroid_data;
+            xSemaphoreGive(gMutex_asteroid_data_buffer);
+            xTaskNotify(updateGame_TaskHandler, 0x1, eSetBits);
         }
-        g_asteroid_data_buffer = new_asteroid_data;
-        xSemaphoreGive(gMutex_asteroid_data_buffer);
-        xTaskNotify(updateGame_TaskHandler, 0x1, eSetBits);
     }
 }
 
@@ -249,12 +316,30 @@ void updatePlayer_Task(void *param)
 {
     while (!DOOMSDAY)
     {
-        xSemaphoreTake(gMutex_player_data_buffer, portMAX_DELAY);
+        if (game_started)
+        {
+            xSemaphoreTake(gMutex_player_data_buffer, portMAX_DELAY);
 
-        updatePlayerPosition(g_player_data_buffer, (gpio_get_level(SHOT_BTN_2_GPIO) == 0), (gpio_get_level(SHOT_BTN_1_GPIO) == 0));
+            updatePlayerPosition(g_player_data_buffer, (gpio_get_level(SHOT_BTN_2_GPIO) == 0), (gpio_get_level(SHOT_BTN_1_GPIO) == 0));
 
-        xSemaphoreGive(gMutex_player_data_buffer);
-
+            xSemaphoreGive(gMutex_player_data_buffer);
+        }
         vTaskDelay(PLAYER_UPDATE_SPEED_MS / portTICK_PERIOD_MS);
+    }
+}
+
+void isrCallbackFunction(void)
+{
+    if (!game_started && !game_lost)
+    {
+        game_started = true;
+    }
+    else if (!game_started && game_lost)
+    {
+        game_lost = false;
+    }
+    else
+    {
+        xTaskNotifyFromISR(createShot_TaskHandler, 0, eNoAction, 0);
     }
 }
