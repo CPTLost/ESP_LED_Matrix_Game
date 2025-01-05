@@ -276,7 +276,7 @@ led_matrix_data_t *updateAsteroidField()
         }
         free(asteroid_objects);
         objects_created_counter = 0;
-        /// It should be okay to assign NULL because it is asteroid objects is only accessed in loops with the
+        /// It should be okay to assign NULL because it is only accessed in loops with the
         /// iterator beeing objects_created_counter this is set to 0 -> loops dont execute
         /// And because its NULL in the next updated call it will be initilaised again
         asteroid_objects = NULL;
@@ -344,7 +344,7 @@ led_matrix_data_t *updateAsteroidField()
     /// Checking if max ring buffer size is reached (= MATRIX_SIDE_LENGTH)
     if (MATRIX_SIDE_LENGTH > asteroid_indices_list.size)
     {
-        insertAtEnd_circular(&asteroid_indices_list, index_array, index_array_size); // asteroids per row is not ideal for more than one LED sized asteroid...
+        insertAtEnd_circular(&asteroid_indices_list, index_array, index_array_size);
         /// current_ptr corresponds to the Tail of the list inside this if statement
         traversList_once(&asteroid_indices_list, getCurrentPtr);
     }

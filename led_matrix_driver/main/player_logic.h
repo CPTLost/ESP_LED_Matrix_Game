@@ -22,4 +22,6 @@ typedef struct
 
 extern const player_t normal_player;
 
+player_data_t *initPlayer(player_t *player_type);
+
 #endif

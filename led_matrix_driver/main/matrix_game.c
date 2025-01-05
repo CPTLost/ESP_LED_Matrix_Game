@@ -77,19 +77,20 @@ void app_main(void)
 {
 
     ////////////// temp test code :
-    static uint16_t player_index_array[] = {7, 8, 9, 8 + MATRIX_SIDE_LENGTH};
-    static uint16_t player_shot_start_pos = 8;
-    static player_data_t normal_player_data = {.player_type = &normal_player,
-                                               .shot_start_position = 8,
-                                               .player_index_array = player_index_array,
-                                               .array_size = ARRAY_LENGTH(player_index_array)};
+    // static uint16_t player_index_array[] = {7, 8, 9, 8 + MATRIX_SIDE_LENGTH};
+    // static uint16_t player_shot_start_pos = 8;
+    // static player_data_t normal_player_data = {.player_type = &normal_player,
+    //                                            .shot_start_position = 8,
+    //                                            .player_index_array = player_index_array,
+    //                                            .array_size = ARRAY_LENGTH(player_index_array)};
 
-    g_player_data_buffer = &normal_player_data;
+    // g_player_data_buffer = &normal_player_data;
     /////////
 
     // config interrupts etc
 
     initLedMatrix();
+    g_player_data_buffer = initPlayer(&normal_player);
 
     gMutex_matrix_data_buffer = xSemaphoreCreateMutex();
     gMutex_asteroid_data_buffer = xSemaphoreCreateMutex();
@@ -106,14 +107,6 @@ void app_main(void)
     xTaskCreate(updatePlayer_Task, "updatePlayer_Task", STD_TASK_STACKSIZE, NULL, STD_TASK_PRIORITY, &updatePlayer_TaskHandler);
 
     xTaskCreate(test_create_shot_Task, "test_create_shot_Task", STD_TASK_STACKSIZE, NULL, STD_TASK_PRIORITY, &test_create_shot_TaskHandler);
-
-    // // test
-    // vTaskDelay(2000 / portTICK_PERIOD_MS);
-    // while (1)
-    // {
-    //     xTaskNotify(updateGame_TaskHandler, 0, eSetValueWithOverwrite);
-    //     vTaskDelay(100 / portTICK_PERIOD_MS);
-    // }
 }
 
 void updateGame_Task(void *param)
