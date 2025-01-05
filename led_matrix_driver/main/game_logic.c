@@ -247,6 +247,7 @@ led_matrix_data_t *updateGame(led_matrix_data_t *asteroid_data, bool new_asteroi
         shot_asteroids_indices = malloc(sizeof(*shot_asteroids_indices) * asteroid_data->array_length);
     }
 
+
     updateShotAsteroidIndices(new_asteroid_data, asteroid_data);
 
     /// Maps asteroids positions on a Matrix with bool values

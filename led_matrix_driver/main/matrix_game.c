@@ -8,6 +8,7 @@
 #include <freertos/semphr.h>
 #include <freertos/task.h>
 #include <esp_random.h>
+#include <driver/gpio.h>
 
 #include "led_strip.h"
 
@@ -21,8 +22,12 @@
 #define DOOMSDAY 0
 
 #define PLAYER_UPDATE_SPEED_MS 100
+#define FRAME_UPDATE_TIME_MS 10
+#define SHOT_COOLDOWN_IN_MS 200
 
-#define STD_TASK_STACKSIZE 2048
+#define SHOT_BTN_GPIO 2
+
+#define STD_TASK_STACKSIZE 4096
 #define STD_TASK_PRIORITY 3
 
 #define ARRAY_LENGTH(x) sizeof(x) / sizeof(x[0])
@@ -50,10 +55,12 @@ static TaskHandle_t test_create_shot_TaskHandler = NULL;
 /// global variables
 static led_matrix_data_t *g_matrix_data_buffer = NULL;
 static led_matrix_data_t *g_asteroid_data_buffer = NULL;
+static uint32_t g_asteroid_delay_ms = 300;
 static shot_data_t **g_shot_data_array = NULL; // pointer array
-static player_data_t *g_player_data_buffer = NULL;
-static uint32_t g_asteroid_delay_ms = 500;
 static uint8_t g_shot_data_array_size = 0;
+static player_data_t *g_player_data_buffer = NULL;
+
+// static bool new_asteroid_data_flag = false;
 
 /// task declarations
 void updateGame_Task(void *param);
@@ -63,6 +70,11 @@ void createShot_Task(void *param);
 void updateShotDataArray_Task(void *param);
 // still needs to be implemented
 void updatePlayer_Task(void *param);
+
+void trigger_shot(void)
+{
+    xTaskNotifyFromISR(createShot_TaskHandler, 0, eNoAction, 0);
+}
 
 void test_create_shot_Task(void *param)
 {
@@ -90,6 +102,7 @@ void app_main(void)
     // config interrupts etc
 
     initLedMatrix();
+    init_button_for_shot_trigger(SHOT_BTN_GPIO);
     g_player_data_buffer = initPlayer(&normal_player);
 
     gMutex_matrix_data_buffer = xSemaphoreCreateMutex();
@@ -115,39 +128,46 @@ void updateGame_Task(void *param)
     {
         /// changing asteroid delay still missing and maybe also changing row_offset
         uint32_t notification_value = 0;
-        xTaskNotifyWait(0x00, UINT32_MAX, &notification_value, portMAX_DELAY);
-
-        xSemaphoreTake(gMutex_asteroid_data_buffer, portMAX_DELAY);
-        xSemaphoreTake(gMutex_player_data_buffer, portMAX_DELAY);
-        xSemaphoreTake(gMutex_shot_data_array, portMAX_DELAY);
-        xSemaphoreTake(gMutex_shot_data_array_size, portMAX_DELAY);
-
-        bool new_asteroid_data_flag = false;
-        if ((notification_value & 0x01) != 0)
+        xTaskNotifyWait(0x00, UINT32_MAX, &notification_value, 0);
+        // xTaskNotifyWait(0x00, UINT32_MAX, &notification_value, portMAX_DELAY);
+        if (NULL != g_asteroid_data_buffer)
         {
-            new_asteroid_data_flag = true;
+
+            xSemaphoreTake(gMutex_asteroid_data_buffer, portMAX_DELAY);
+            xSemaphoreTake(gMutex_player_data_buffer, portMAX_DELAY);
+            xSemaphoreTake(gMutex_shot_data_array, portMAX_DELAY);
+            xSemaphoreTake(gMutex_shot_data_array_size, portMAX_DELAY);
+
+            bool new_asteroid_data_flag = false;
+            if ((notification_value & 0x01) != 0)
+            {
+                new_asteroid_data_flag = true;
+            }
+
+            led_matrix_data_t *new_matrix_data = updateGame(
+                g_asteroid_data_buffer, new_asteroid_data_flag,
+                g_player_data_buffer, g_shot_data_array, g_shot_data_array_size);
+
+            xSemaphoreGive(gMutex_asteroid_data_buffer);
+            xSemaphoreGive(gMutex_player_data_buffer);
+            xSemaphoreGive(gMutex_shot_data_array);
+            xSemaphoreGive(gMutex_shot_data_array_size);
+
+            xSemaphoreTake(gMutex_matrix_data_buffer, portMAX_DELAY);
+            if (NULL != g_matrix_data_buffer)
+            {
+                free(g_matrix_data_buffer->ptr_index_array_leds_to_set);
+                free(g_matrix_data_buffer->ptr_rgb_array_leds_to_set);
+                free(g_matrix_data_buffer);
+            }
+            g_matrix_data_buffer = new_matrix_data;
+            xSemaphoreGive(gMutex_matrix_data_buffer);
+
+            xTaskNotify(updateLedMatrix_TaskHandler, 0, eNoAction);
+            xTaskNotify(updateShotDataArray_TaskHandler, 0, eNoAction);
         }
 
-        led_matrix_data_t *new_matrix_data = updateGame(
-            g_asteroid_data_buffer, new_asteroid_data_flag,
-            g_player_data_buffer, g_shot_data_array, g_shot_data_array_size);
-
-        xSemaphoreGive(gMutex_asteroid_data_buffer);
-        xSemaphoreGive(gMutex_player_data_buffer);
-        xSemaphoreGive(gMutex_shot_data_array);
-        xSemaphoreGive(gMutex_shot_data_array_size);
-
-        xSemaphoreTake(gMutex_matrix_data_buffer, portMAX_DELAY);
-        if (NULL != g_matrix_data_buffer)
-        {
-            free(g_matrix_data_buffer->ptr_index_array_leds_to_set);
-            free(g_matrix_data_buffer->ptr_rgb_array_leds_to_set);
-        }
-        g_matrix_data_buffer = new_matrix_data;
-        xSemaphoreGive(gMutex_matrix_data_buffer);
-
-        xTaskNotify(updateLedMatrix_TaskHandler, 0, eNoAction);
-        xTaskNotify(updateShotDataArray_TaskHandler, 0, eNoAction);
+        vTaskDelay(FRAME_UPDATE_TIME_MS / portTICK_PERIOD_MS);
     }
 }
 
@@ -211,7 +231,8 @@ void createShot_Task(void *param)
         xSemaphoreGive(gMutex_shot_data_array_size);
         xSemaphoreGive(gMutex_shot_data_array);
 
-        xTaskNotify(updateGame_TaskHandler, NULL, eNoAction);
+        xTaskNotify(updateGame_TaskHandler, NULL, eNoAction); // do I still need this?
+        vTaskDelay(SHOT_COOLDOWN_IN_MS / portTICK_PERIOD_MS);
     }
 }
 
