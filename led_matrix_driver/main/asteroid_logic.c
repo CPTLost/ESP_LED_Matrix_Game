@@ -7,6 +7,7 @@
 #include <esp_random.h>
 #include <stdlib.h>
 #include <assert.h>
+#include "sdkconfig.h"
 
 #include "led_matrix_driver.h"
 #include "return_val.h"
@@ -177,7 +178,8 @@ void circular_linked_list_test()
     deleteList(&list_1);
 }
 
-/// THE USER MUST DEALLOCATE THE RETURNED DATA WHEN NOT USED ANYMORE
+/// @brief This function generates asteroids with randomly selected shapes and start positions and also manages the movement thorugh the matrix
+/// @return it retruns led_matrix_data_t data that contains all LED indices where an asteroid exists and also its color. This data can me given to the updateGame() function.
 led_matrix_data_t *updateAsteroidField()
 {
     /// Init of asteroid_objects

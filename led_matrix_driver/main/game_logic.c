@@ -13,7 +13,6 @@
 #include "player_logic.h"
 #include "led_matrix_driver.h"
 
-
 #define HIT_POINTS 1
 #define NUMBER_OF_POSSIBLE_COLLISION_POINTS 4 // This is determined by the player model and size
 
@@ -233,26 +232,25 @@ static return_val_t checkShotAsteroidCollision(bool set_asteroid_indices[], led_
     return SUCCESS;
 }
 
+/// @brief This function combines all data handles collisions, movement etc. and calculates all pixel that need to be set.
+/// @brief IMPORTANT: the returned data was created with malloc -> the user must handle the deallocation
+/// @param asteroid_data
+/// @param new_asteroid_data
+/// @param player_data
+/// @param shot_data_array
+/// @param shot_data_array_size
+/// @param game_lost
+/// @return led_matrix_data_t data which contains all indices and colors of every pixel that needs to be set. This data can be given to the updateLedMatrix(led_matrix_data_t *new_data) function as a parameter.
 led_matrix_data_t *updateGame(led_matrix_data_t *asteroid_data, bool new_asteroid_data,
                               player_data_t *player_data, shot_data_t **shot_data_array, uint8_t shot_data_array_size, bool *game_lost)
 {
     /// checks for valid inputs
     if (HIT_POINTS <= g_player_hit_counter)
     {
-        // ESP_LOGI(TAG, "GAME OVER\n");
         *game_lost = true;
         g_player_hit_counter = 0;
+    }
 
-        /// change the color of the player to indicate that he/she has lost
-        // player_data->player_type->player_rgb_values[0] = 25;
-        // player_data->player_type->player_rgb_values[1] = 0;
-        // player_data->player_type->player_rgb_values[2] = 0;
-    }
-    else
-    {
-        /// Standard color
-        // player_data->player_type->player_rgb_values = normal_player.player_rgb_values;
-    }
     if (NULL == asteroid_data)
     {
         ESP_LOGE(TAG, "NULL Asteroid Data\n");
@@ -369,6 +367,5 @@ led_matrix_data_t *updateGame(led_matrix_data_t *asteroid_data, bool new_asteroi
     matrix_data->ptr_rgb_array_leds_to_set = ptr_rgb_array;
     matrix_data->array_length = combined_array_length;
 
-    /// THE USER MUST DEALLOCATE THE RETURNED DATA WHEN NOT USED ANYMORE
     return matrix_data;
 }

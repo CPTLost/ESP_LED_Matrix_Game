@@ -74,6 +74,10 @@ return_val_t init_buttons_for_shot_trigger(uint8_t GPIO_BUTTON_PIN_1, uint8_t GP
 
 __attribute__((weak)) void isrCallbackFunction(void) {}
 
+/// @brief This function creates a shot of shot_data_t type and returns it.
+/// @param player_data 
+/// @param shot_type defines the dimensions and color of the shot
+/// @return shot_data_t new_shot
 shot_data_t *createShot(player_data_t *player_data, shot_t *shot_type)
 {
     if (NULL == player_data)
@@ -169,10 +173,9 @@ shot_data_t *createShot(player_data_t *player_data, shot_t *shot_type)
 
     return new_shot_data;
 }
-// This created shot is then appended to a global shot array.
-// The GL should be called by a task notify as long as the shot array isnt empty so it can update the shots
 
-/// @brief updates shot_data_array: deletes expired shots and creates new array containing the given new_shot and all old valid shots.
+
+/// @brief updates the parameter shot_data_array: deletes expired shots and creates new array containing the given new_shot and all old valid shots.
 /// @param new_shot ptr to new shot
 /// @param shot_data_array ptr to shot data array
 /// @param ptr_shot_data_array_size ptr to shot_data_array_size

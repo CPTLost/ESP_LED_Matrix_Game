@@ -87,6 +87,10 @@ player_data_t *initPlayer(player_t *player_type)
     return player_data;
 }
 
+/// @brief This function updates the player position according to its parameter values. Depending how often/fast this function is called your player moves proportionally fast
+/// @param player_data
+/// @param move_left moves left if only move_left is true
+/// @param move_right moves rigth if only move_rigth is true
 void updatePlayerPosition(player_data_t *player_data, bool move_left, bool move_right)
 {
     if (true == (move_left && move_right))
