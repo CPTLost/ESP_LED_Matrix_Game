@@ -448,6 +448,38 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
+# ASTEROID DESTROYER - Game Configuration
+#
+
+#
+# Asteroid Field Configuration
+#
+CONFIG_MAX_OFFSET=4
+CONFIG_MIN_OFFSET=2
+CONFIG_ASTEROID_UPDATE_DELAY_IN_MS=400
+# end of Asteroid Field Configuration
+
+#
+# LED Matrix Configuration
+#
+CONFIG_GPIO_PIN_LED_MATRIX=8
+# CONFIG_MATRIX_5X5 is not set
+CONFIG_MATRIX_16X16=y
+# CONFIG_MATRIX_32X32 is not set
+# end of LED Matrix Configuration
+
+#
+# Gameplay Configuration
+#
+CONFIG_PLAYER_UPDATE_DELAY_IN_MS=100
+CONFIG_FRAME_UPDATE_DELAY_IN_MS=10
+CONFIG_SHOT_COOLDOWN_IN_MS=200
+CONFIG_RIGHT_BTN_GPIO_PIN=2
+CONFIG_LEFT_BTN_GPIO_PIN=9
+# end of Gameplay Configuration
+# end of ASTEROID DESTROYER - Game Configuration
+
+#
 # Graphics Configuration
 #
 CONFIG_GRAPHICS_I2CADDR=60

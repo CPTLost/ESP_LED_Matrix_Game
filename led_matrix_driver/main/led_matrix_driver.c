@@ -15,7 +15,7 @@
 
 /*Maybe put into SDK config in the main project?*/
 
-#define GPIO_PIN_LED_MATRIX 8
+#define GPIO_PIN_LED_MATRIX CONFIG_GPIO_PIN_LED_MATRIX
 
 const char *TAG = "LED_MATRIX_DRIVER";
 

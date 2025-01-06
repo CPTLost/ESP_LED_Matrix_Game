@@ -11,6 +11,8 @@
 
 #include "return_val.h"
 #include "player_logic.h"
+#include "led_matrix_driver.h"
+
 
 #define HIT_POINTS 1
 #define NUMBER_OF_POSSIBLE_COLLISION_POINTS 4 // This is determined by the player model and size

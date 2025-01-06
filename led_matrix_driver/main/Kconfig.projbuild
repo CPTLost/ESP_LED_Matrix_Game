@@ -1,0 +1,81 @@
+menu "ASTEROID DESTROYER - Game Configuration"
+    
+    menu "Asteroid Field Configuration"
+        config MAX_OFFSET
+            int "MAX Asteroid offset"
+            range 1 10
+            default 4
+            help
+                The game generates a new asteroid depending on a randomly generated offset between MIN and MAX OFFSET.
+                The offset decides the distance between two asteroid start points counted in led lines.
+
+        config MIN_OFFSET
+            int "MIN Asteroid offset"
+            range 1 10
+            default 2
+            help
+                The game generates a new asteroid depending on a randomly generated offset between MIN and MAX OFFSET.
+                The offset decides the distance between two asteroid start points counted in led lines.
+
+        config ASTEROID_UPDATE_DELAY_IN_MS
+            int "Asteroid update delay in ms"
+            range 0 1000
+            default 400
+            help
+                Determines how fast the asteroids approach you in the game
+    endmenu
+    
+    menu "LED Matrix Configuration"
+        config GPIO_PIN_LED_MATRIX
+            int "GPIO LED Matrix pin"
+            default 8
+
+        choice LED_MATRIX_SIZE
+            prompt "Slect the Size of the LED Matrix"
+            default MATRIX_32X32
+            
+            config MATRIX_5X5
+                bool "5x5 Matrix"
+        
+            config MATRIX_16X16
+                bool "16x16 Matrix"
+        
+            config MATRIX_32X32
+                bool "32x32 Matrix"
+        endchoice
+            
+    endmenu 
+
+    menu "Gameplay Configuration"
+        config PLAYER_UPDATE_DELAY_IN_MS
+            int "Player updated delay in ms"
+            range 10 1000
+            default 100
+            help
+                Determines how fast your player moves 
+
+        config FRAME_UPDATE_DELAY_IN_MS
+            int "Frame updated delay in ms"
+            range 10 1000
+            default 10
+            help
+                Determines how fast the LED Matrix updates its pixel values. Also controles the traveling speed of a shot.
+
+        config SHOT_COOLDOWN_IN_MS
+            int "Shot cooldown in ms"
+            range 10 10000
+            default 200
+            help
+                Determines the possible fire rate of the player
+
+        config RIGHT_BTN_GPIO_PIN
+            int "Right button GPIO pin"
+            default 2
+
+        config LEFT_BTN_GPIO_PIN
+            int "Left button GPIO pin"
+            default 9
+
+    endmenu
+
+endmenu

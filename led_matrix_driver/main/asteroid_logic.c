@@ -14,8 +14,8 @@
 #define ARRAY_LENGTH(x) sizeof(x) / sizeof(x[0])
 
 #define MAX_AST_OBJ_ALLOWED 64
-#define MAX_OFFSET 3
-#define MIN_OFFSET 2
+#define MAX_OFFSET CONFIG_MAX_OFFSET
+#define MIN_OFFSET CONFIG_MIN_OFFSET
 
 static const char *TAG = "ASTEROID_LOGIC";
 typedef struct _node_t
@@ -44,15 +44,15 @@ typedef struct
     uint16_t start_index;
 } asteroid_t;
 
-#ifdef MATRIX_5X5
+#if CONFIG_MATRIX_5X5
 static const uint8_t block_s_shape_array[] = {1};
 static const uint8_t block_m_shape_array[] = {2, 2};
 static const uint8_t block_l_shape_array[] = {3, 3};
-#elif defined MATRIX_16X16
+#elif CONFIG_MATRIX_16X16
 static const uint8_t block_s_shape_array[] = {1, 3, 1};
 static const uint8_t block_m_shape_array[] = {2, 4, 4, 2};
 static const uint8_t block_l_shape_array[] = {3, 5, 5, 3};
-#elif defined MATRIX_32X32
+#elif CONFIG_MATRIX_32X32
 static const uint8_t block_s_shape_array[] = {2, 4, 4, 2};
 static const uint8_t block_m_shape_array[] = {3, 5, 5, 3};
 static const uint8_t block_l_shape_array[] = {4, 6, 6, 4};

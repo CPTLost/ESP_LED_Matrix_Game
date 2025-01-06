@@ -24,12 +24,12 @@
 
 #define DOOMSDAY 0
 
-#define PLAYER_UPDATE_SPEED_MS 100
-#define FRAME_UPDATE_TIME_MS 10
-#define SHOT_COOLDOWN_IN_MS 200
+#define PLAYER_UPDATE_SPEED_MS CONFIG_PLAYER_UPDATE_DELAY_IN_MS
+#define FRAME_UPDATE_TIME_MS CONFIG_FRAME_UPDATE_DELAY_IN_MS
+#define SHOT_COOLDOWN_IN_MS CONFIG_SHOT_COOLDOWN_IN_MS
 
-#define SHOT_BTN_1_GPIO 2 // right button
-#define SHOT_BTN_2_GPIO 9 // left button
+#define SHOT_BTN_1_GPIO CONFIG_RIGHT_BTN_GPIO_PIN
+#define SHOT_BTN_2_GPIO CONFIG_LEFT_BTN_GPIO_PIN
 
 #define STD_TASK_STACKSIZE 4096
 #define STD_TASK_PRIORITY 3
@@ -58,7 +58,7 @@ static TaskHandle_t gameDisplay_TaskHandler = NULL;
 /// global variables
 static led_matrix_data_t *g_matrix_data_buffer = NULL;
 static led_matrix_data_t *g_asteroid_data_buffer = NULL;
-static uint32_t g_asteroid_delay_ms = 300;
+static uint32_t g_asteroid_delay_ms = CONFIG_ASTEROID_UPDATE_DELAY_IN_MS;
 static shot_data_t **g_shot_data_array = NULL; // pointer array
 static uint8_t g_shot_data_array_size = 0;
 static player_data_t *g_player_data_buffer = NULL;
