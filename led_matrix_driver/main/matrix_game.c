@@ -31,7 +31,7 @@
 #define SHOT_BTN_1_GPIO CONFIG_RIGHT_BTN_GPIO_PIN
 #define SHOT_BTN_2_GPIO CONFIG_LEFT_BTN_GPIO_PIN
 
-#define STD_TASK_STACKSIZE 4096
+#define STD_TASK_STACKSIZE 8192
 #define STD_TASK_PRIORITY 3
 
 #define ARRAY_LENGTH(x) sizeof(x) / sizeof(x[0])
@@ -135,6 +135,7 @@ void gameDisplay_Task(void *param)
             graphics_finishUpdate();
             vTaskDelay(300 / portTICK_PERIOD_MS);
         }
+        ESP_LOGI(TAG_MAIN, "Game Started");
         stop_asteriods = false;
         ESP_ERROR_CHECK(gptimer_start(gptimer));
 
@@ -155,6 +156,7 @@ void gameDisplay_Task(void *param)
             graphics_finishUpdate();
             vTaskDelay(100 / portTICK_PERIOD_MS);
         }
+        ESP_LOGI(TAG_MAIN, "Game LOST");
         game_started = false;
         ESP_ERROR_CHECK(gptimer_stop(gptimer));
         ESP_ERROR_CHECK(gptimer_set_raw_count(gptimer, 0));
@@ -168,6 +170,8 @@ void gameDisplay_Task(void *param)
         {
             vTaskDelay(10 / portTICK_PERIOD_MS);
         }
+
+        ESP_LOGI(TAG_MAIN, "Game Reset");
 
         stop_asteriods = true;
         xSemaphoreTake(gMutex_asteroid_data_buffer, portMAX_DELAY);
@@ -290,7 +294,7 @@ void createShot_Task(void *param)
         xSemaphoreGive(gMutex_shot_data_array_size);
         xSemaphoreGive(gMutex_shot_data_array);
 
-        xTaskNotify(updateGame_TaskHandler, NULL, eNoAction); 
+        xTaskNotify(updateGame_TaskHandler, NULL, eNoAction);
         vTaskDelay(SHOT_COOLDOWN_IN_MS / portTICK_PERIOD_MS);
     }
 }
