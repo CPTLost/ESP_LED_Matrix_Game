@@ -75,7 +75,7 @@ return_val_t init_buttons_for_shot_trigger(uint8_t GPIO_BUTTON_PIN_1, uint8_t GP
 __attribute__((weak)) void isrCallbackFunction(void) {}
 
 /// @brief This function creates a shot of shot_data_t type and returns it.
-/// @param player_data 
+/// @param player_data
 /// @param shot_type defines the dimensions and color of the shot
 /// @return shot_data_t new_shot
 shot_data_t *createShot(player_data_t *player_data, shot_t *shot_type)
@@ -174,7 +174,6 @@ shot_data_t *createShot(player_data_t *player_data, shot_t *shot_type)
     return new_shot_data;
 }
 
-
 /// @brief updates the parameter shot_data_array: deletes expired shots and creates new array containing the given new_shot and all old valid shots.
 /// @param new_shot ptr to new shot
 /// @param shot_data_array ptr to shot data array
@@ -228,40 +227,36 @@ return_val_t updatedShotDataArray(shot_data_t *new_shot, shot_data_t ***shot_dat
         new_shot_data_array_size += 1;
     }
 
-    /// if new_shot_data_array_size == *ptr_shot_data_array_size there is no need to create new array coz no shot expired and no new shot needs to be added
-    if (new_shot_data_array_size != *ptr_shot_data_array_size)
+    shot_data_t **new_shot_data_array = NULL;
+    if (new_shot_data_array_size > 0)
     {
-        shot_data_t **new_shot_data_array = NULL;
-        if (new_shot_data_array_size > 0)
+        if (NULL == (new_shot_data_array = malloc(sizeof(**shot_data_array) * new_shot_data_array_size)))
         {
-            if (NULL == (new_shot_data_array = malloc(sizeof(**shot_data_array) * new_shot_data_array_size)))
-            {
-                ESP_LOGE(TAG, "Memory alloaction failed while creating:\nnew_shot_data_array\n");
-            }
+            ESP_LOGE(TAG, "Memory alloaction failed while creating:\nnew_shot_data_array\n");
         }
-
-        /// if shot_data_array is not empty, copy all non NULL values from the shot_data_array to the new_shot_data_array
-        if ((NULL != *shot_data_array) && (NULL != new_shot_data_array))
-        {
-            uint8_t shots_copied_counter = 0;
-            for (uint8_t i = 0; i < *ptr_shot_data_array_size; i += 1)
-            {
-                if (NULL != (*shot_data_array)[i])
-                {
-                    new_shot_data_array[shots_copied_counter] = (*shot_data_array)[i];
-                    shots_copied_counter += 1;
-                }
-            }
-        }
-
-        if ((NULL != new_shot) && (NULL != new_shot_data_array))
-        {
-            new_shot_data_array[new_shot_data_array_size - 1] = new_shot;
-        }
-
-        *shot_data_array = new_shot_data_array;
-        *ptr_shot_data_array_size = new_shot_data_array_size;
     }
+
+    /// if shot_data_array is not empty, copy all non NULL values from the shot_data_array to the new_shot_data_array
+    if ((NULL != *shot_data_array) && (NULL != new_shot_data_array))
+    {
+        uint8_t shots_copied_counter = 0;
+        for (uint8_t i = 0; i < *ptr_shot_data_array_size; i += 1)
+        {
+            if (NULL != (*shot_data_array)[i])
+            {
+                new_shot_data_array[shots_copied_counter] = (*shot_data_array)[i];
+                shots_copied_counter += 1;
+            }
+        }
+    }
+
+    if ((NULL != new_shot) && (NULL != new_shot_data_array))
+    {
+        new_shot_data_array[new_shot_data_array_size - 1] = new_shot;
+    }
+
+    *shot_data_array = new_shot_data_array;
+    *ptr_shot_data_array_size = new_shot_data_array_size;
 
     return SUCCESS;
 }

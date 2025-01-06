@@ -181,7 +181,6 @@ static return_val_t checkShotAsteroidCollision(bool set_asteroid_indices[], led_
             ESP_LOGE(TAG, "Memory allocation failed while creating:\nnew_shot_asteroids_indices\n");
             return MEM_ALLOC_ERROR;
         }
-
         /// checks shot and asteroid collision and saves hit asteroid index
         uint8_t counter = 0;
         for (uint16_t i = 0; i < shot_data_array_size; i += 1)
@@ -280,6 +279,7 @@ led_matrix_data_t *updateGame(led_matrix_data_t *asteroid_data, bool new_asteroi
         set_asteroid_indices[shot_asteroids_indices[i]] = false;
     }
 
+    // maybe shot data check if not nULL or so
     checkShotAsteroidCollision(set_asteroid_indices, asteroid_data, shot_data_array, shot_data_array_size);
 
     /// Increments all shot positions (shots go up)

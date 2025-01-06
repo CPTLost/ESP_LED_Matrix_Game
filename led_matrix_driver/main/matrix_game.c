@@ -201,7 +201,6 @@ void updateGame_Task(void *param)
             {
                 new_asteroid_data_flag = true;
             }
-
             led_matrix_data_t *new_matrix_data = updateGame(
                 g_asteroid_data_buffer, new_asteroid_data_flag,
                 g_player_data_buffer, g_shot_data_array, g_shot_data_array_size, &game_lost);
@@ -291,7 +290,7 @@ void createShot_Task(void *param)
         xSemaphoreGive(gMutex_shot_data_array_size);
         xSemaphoreGive(gMutex_shot_data_array);
 
-        xTaskNotify(updateGame_TaskHandler, NULL, eNoAction); // do I still need this?
+        xTaskNotify(updateGame_TaskHandler, NULL, eNoAction); 
         vTaskDelay(SHOT_COOLDOWN_IN_MS / portTICK_PERIOD_MS);
     }
 }
